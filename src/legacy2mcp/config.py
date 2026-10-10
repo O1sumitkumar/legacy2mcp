@@ -1,16 +1,17 @@
 """
 Configuration schema for legacy2mcp.
 
-Config is a single YAML file. Anything secret (passwords, API keys)
-is referenced by *_env fields and read from the process environment
-at startup -- never written into the YAML directly. This keeps
-config files safe to commit to a repo alongside the app.
+Config is a single YAML file. Anything secret (passwords, API keys,
+connection strings) is referenced by *_env fields and read from the
+process environment at startup -- never written into the YAML
+directly. This keeps config files safe to commit to a repo alongside
+the app.
 
-v0.1 only implements the "soap" adapter type. "db" and "queue" are
-accepted here (so config files can be written forward-compatibly and
-the roadmap in the README is credible) but `build_adapter()` raises a
-clear NotImplementedError for them today rather than pretending to
-support something that doesn't exist yet.
+v0.1 implements the "soap" adapter type. v0.2 adds "db" (Postgres /
+SQL Server / Oracle, table allowlist + named parameterized queries
+only -- no arbitrary SQL from the LLM, ever). "queue" is accepted here
+(so config files can be written forward-compatibly) but
+`build_adapter()` raises a clear NotImplementedError for it today.
 """
 
 from __future__ import annotations
@@ -55,6 +56,63 @@ class SoapAdapterSettings(BaseModel):
     timeout_seconds: float = 15.0
 
 
+class DbTableSettings(BaseModel):
+    """One allowlisted table. Columns are introspected from the live DB schema
+    at startup -- not hand-maintained here -- so tools can't drift from the
+    database the way the SOAP adapter's tools can't drift from the WSDL."""
+
+    name: str
+    db_schema: str | None = Field(default=None, alias="schema")
+    # Operations exposed for this table. "insert" additionally requires the
+    # adapter-level allow_write_operations: true (defense in depth on top of
+    # this already-explicit allowlist).
+    operations: list[Literal["select", "insert"]] = Field(default_factory=lambda: ["select"])
+    # Column allowlist. None = all introspected columns are exposed.
+    columns: list[str] | None = None
+    # Subset of `columns` usable as equality filters on select_<table>.
+    filterable_columns: list[str] = Field(default_factory=list)
+    max_rows: int = 200
+
+    model_config = {"populate_by_name": True}
+
+
+class DbQueryParamSettings(BaseModel):
+    name: str
+    type: Literal["string", "integer", "number", "boolean"] = "string"
+    required: bool = True
+
+
+class DbQuerySettings(BaseModel):
+    """A named, parameterized query. `sql` is written by whoever owns the
+    config file, with `:param_name` placeholders -- never by the LLM, which
+    only ever supplies the placeholder values declared in `params`."""
+
+    name: str
+    sql: str
+    description: str = ""
+    params: list[DbQueryParamSettings] = Field(default_factory=list)
+    # Write queries (INSERT/UPDATE/DELETE) also require allow_write_operations.
+    write: bool = False
+    max_rows: int = 200
+
+
+class DbAdapterSettings(BaseModel):
+    dialect: Literal["postgres", "mssql", "oracle"]
+    dsn_env: str
+    allow_write_operations: bool = False
+    tables: list[DbTableSettings] = Field(default_factory=list)
+    queries: list[DbQuerySettings] = Field(default_factory=list)
+    timeout_seconds: float = 15.0
+
+    def resolve_dsn(self) -> str:
+        value = os.environ.get(self.dsn_env)
+        if value is None:
+            raise ValueError(
+                f"Environment variable '{self.dsn_env}' is not set (required for the DB connection string)."
+            )
+        return value
+
+
 class AdapterConfig(BaseModel):
     id: str
     type: Literal["soap", "db", "queue"]
@@ -65,6 +123,11 @@ class AdapterConfig(BaseModel):
         if self.type != "soap":
             raise ValueError(f"Adapter '{self.id}' is type '{self.type}', not 'soap'.")
         return SoapAdapterSettings.model_validate(self.config)
+
+    def db_settings(self) -> DbAdapterSettings:
+        if self.type != "db":
+            raise ValueError(f"Adapter '{self.id}' is type '{self.type}', not 'db'.")
+        return DbAdapterSettings.model_validate(self.config)
 
 
 class AuditConfig(BaseModel):

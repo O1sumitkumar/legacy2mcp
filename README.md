@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
-<p><b>Point it at a WSDL. Get an MCP server whose tools can't drift from the service, can't send unvalidated arguments, and can't call write operations you didn't opt into.</b></p>
+<p><b>Point it at a WSDL or a database. Get an MCP server whose tools can't drift from the underlying schema, can't send unvalidated arguments, and can't call write operations (or run arbitrary SQL) you didn't opt into.</b></p>
 
 <img src="demo/legacy2mcp.gif" alt="legacy2mcp turning a Calculator WSDL into four typed, schema-validated MCP tools" width="820">
 
@@ -22,7 +22,7 @@
 ---
 
 > [!NOTE]
-> `legacy2mcp` introspects every operation in a WSDL, builds a real JSON Schema for each one **from the WSDL's own XSD types**, and exposes them as [MCP](https://modelcontextprotocol.io/) tools — with **every call schema-validated before it reaches your SOAP endpoint**, **write-like operations excluded by default**, and **every call audit-logged**. No hand-written adapter code, no hand-maintained schemas.
+> `legacy2mcp` introspects a legacy system — every operation in a WSDL, or a database's live schema — builds a real JSON Schema for each tool **from that introspected schema**, and exposes them as [MCP](https://modelcontextprotocol.io/) tools — with **every call schema-validated before it reaches your SOAP endpoint or database**, **write-like/write operations excluded by default**, and **every call audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
 
 ## Contents
 
@@ -30,6 +30,7 @@
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
 - [Point it at your own WSDL](#point-it-at-your-own-wsdl)
+- [Point it at your own database](#point-it-at-your-own-database)
 - [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client)
 - [What's handled](#whats-handled)
 - [Safety model](#safety-model)
@@ -79,19 +80,26 @@ docker compose run --rm legacy2mcp legacy2mcp inspect \
 ```mermaid
 flowchart LR
   WSDL["WSDL / XSD"] --> GEN["legacy2mcp<br/>schema generation"]
-  GEN --> TOOLS["Typed MCP tools<br/>one per operation"]
+  DB["DB schema<br/>(allowlisted tables)"] --> GEN
+  GEN --> TOOLS["Typed MCP tools<br/>one per operation / table / query"]
   AGENT["AI agent /<br/>MCP client"] -->|tool call| VAL{"schema<br/>validation"}
   TOOLS -. defines .-> VAL
-  VAL -->|invalid args| REJ["rejected, never<br/>reaches SOAP"]
-  VAL -->|valid and allowed| SOAP["SOAP endpoint"]
-  SOAP --> RESP["plain JSON<br/>back to the agent"]
+  VAL -->|invalid args| REJ["rejected, never<br/>reaches SOAP/DB"]
+  VAL -->|valid and allowed| BACKEND["SOAP endpoint<br/>or database"]
+  BACKEND --> RESP["plain JSON<br/>back to the agent"]
   VAL --> LOG[("audit log")]
 ```
 
+**SOAP:**
 1. Loads the WSDL with [`zeep`](https://docs.python-zeep.org/), a mature, widely-used Python SOAP client.
 2. For every operation on every port/binding, converts the XSD input type into a JSON Schema ([`schema/xsd_to_jsonschema.py`](src/legacy2mcp/schema/xsd_to_jsonschema.py)) — simple types, nested complex types, enums and arrays, recursively, depth-limited for pathological WSDLs.
 3. Registers one MCP tool per operation, named `<adapter_id>_<OperationName>`.
 4. On a tool call: validates arguments with `jsonschema` (schemas use `additionalProperties: false`), calls the operation via `zeep`, serializes the response to plain JSON, and writes an audit entry.
+
+**DB:**
+1. Connects with the dialect's driver (`psycopg` / `pyodbc` / `oracledb`, imported lazily) and introspects the live column types for each allowlisted table ([`adapters/db_dialects.py`](src/legacy2mcp/adapters/db_dialects.py)) into JSON Schema ([`schema/sql_to_jsonschema.py`](src/legacy2mcp/schema/sql_to_jsonschema.py)).
+2. Registers `select_<table>` / `insert_<table>` per allowlisted table-and-operation, plus `query_<name>` per named query in config.
+3. On a tool call: validates arguments, builds SQL from the allowlisted table/columns (or runs the config-supplied named query) using one dialect-neutral `:param` placeholder convention, executes it, and writes an audit entry. The LLM never sees or writes SQL text.
 5. Operations whose names look like writes are excluded unless `allow_write_operations: true`.
 
 ## Point it at your own WSDL
@@ -127,6 +135,48 @@ legacy2mcp run     --config config.yaml   # start the MCP server (stdio)
 
 A production-shaped template with comments lives at [`examples/soap/config.template.yaml`](examples/soap/config.template.yaml).
 
+## Point it at your own database
+
+```bash
+pip install "legacy2mcp[db-postgres]"   # or db-mssql / db-oracle
+```
+
+```yaml
+# config.yaml
+adapters:
+  - id: orders
+    type: db
+    config:
+      dialect: postgres             # postgres | mssql | oracle
+      dsn_env: "ORDERS_DB_DSN"      # connection string, read from the environment
+      allow_write_operations: false # insert_<table> / write: true queries stay hidden
+      tables:
+        - name: orders
+          operations: [select]
+          columns: [id, status, total, created_at]   # column allowlist
+          filterable_columns: [status]                # equality filters on select_orders
+          max_rows: 200
+      queries:
+        - name: orders_by_status_since
+          sql: "SELECT id, status, total FROM orders WHERE status = :status AND created_at >= :since"
+          params:
+            - { name: status, type: string, required: true }
+            - { name: since, type: string, required: true }
+```
+
+```bash
+export ORDERS_DB_DSN=...
+legacy2mcp inspect --config config.yaml   # review the generated tools
+```
+
+Columns are introspected from the live schema at startup, the same way SOAP operation
+schemas come from the WSDL -- there's nothing to hand-maintain. **There is no path from
+the LLM to arbitrary SQL, ever**: it can only call `select_<table>` / `insert_<table>` for
+tables listed under `tables:`, or a `query_<name>` tool whose SQL you wrote under
+`queries:` -- the LLM supplies only the placeholder values a query's `params` declare,
+never SQL text. A production-shaped template lives at
+[`examples/db/config.template.yaml`](examples/db/config.template.yaml).
+
 ## Use it from Claude Desktop (or any MCP client)
 
 ```json
@@ -151,6 +201,7 @@ A production-shaped template with comments lives at [`examples/soap/config.templ
 | **Errors** | SOAP faults and transport errors caught and returned as clean messages — no stack traces to the caller |
 | **Auth** | HTTP basic (username + `*_env` password); anonymous |
 | **Transport** | `stdio` (the transport Claude Desktop and most agent frameworks spawn) |
+| **DB dialects** | Postgres, SQL Server, Oracle — table allowlist (`select`/`insert`) with live schema introspection, plus named parameterized queries |
 
 See [docs/security.md](docs/security.md) for the full, honest security model — what's covered today and what isn't yet.
 
@@ -158,14 +209,14 @@ See [docs/security.md](docs/security.md) for the full, honest security model —
 
 | Layer | What it does |
 |---|---|
-| **Schema validation** | No arguments reach the SOAP layer without passing `jsonschema.validate` against that operation's generated schema. |
-| **Read-only by default** | Operation names are matched against write-verb prefixes (`Create`, `Update`, `Delete`, `Cancel`, `Void`, `Submit`, `Pay`, …); those tools aren't exposed unless you set `allow_write_operations: true`. |
-| **Explicit allow / deny** | `include_operations` (allowlist) and `exclude_operations` (denylist) on top of the heuristic. |
+| **Schema validation** | No arguments reach the SOAP/DB layer without passing `jsonschema.validate` against that tool's generated schema. |
+| **Read-only by default** | SOAP: operation names are matched against write-verb prefixes (`Create`, `Update`, `Delete`, `Cancel`, `Void`, `Submit`, `Pay`, …). DB: tables/queries are explicit opt-in, and `insert`/write-marked queries additionally require it. Neither is exposed unless you set `allow_write_operations: true`. |
+| **Explicit allow / deny** | SOAP: `include_operations` / `exclude_operations`. DB: a table/column allowlist — there's no equivalent of "all tables" or arbitrary SQL. |
 | **Audit log** | One JSON line per call — tool, arguments, timestamp, outcome, duration. |
-| **Secret hygiene** | Credentials come from named environment variables; the YAML stays safe to commit. |
+| **Secret hygiene** | Credentials and DB connection strings come from named environment variables; the YAML stays safe to commit. |
 
 > [!WARNING]
-> The write-operation filter is a **name heuristic, not semantic analysis** — an operation called `ProcessRecord` that deletes data would not be caught. For any system where a wrong call has real consequences, set `include_operations` explicitly and don't rely on the heuristic. There is also no auth/authz on the MCP server itself yet — don't expose a v0.1 server to untrusted callers. Details in [docs/security.md](docs/security.md).
+> The SOAP write-operation filter is a **name heuristic, not semantic analysis** — an operation called `ProcessRecord` that deletes data would not be caught. For any system where a wrong call has real consequences, set `include_operations` explicitly and don't rely on the heuristic. The DB adapter's allowlist is explicit by construction, but **there's no column-level data masking** — an allowlisted column's values are always returned as-is. There is also no auth/authz on the MCP server itself yet — don't expose a server to untrusted callers. Details in [docs/security.md](docs/security.md).
 
 ## Use cases
 
@@ -206,15 +257,41 @@ Call the same generated, validated tools from your own code via any MCP client l
 | Key | Default | Meaning |
 |---|---|---|
 | `server.name` | `legacy2mcp` | MCP server name reported to clients |
-| `server.transport` | `stdio` | only `stdio` is implemented in v0.1 |
+| `server.transport` | `stdio` | only `stdio` is implemented so far |
 | `adapters[].id` | — | prefix for this adapter's tool names |
-| `adapters[].type` | — | `soap` (implemented); `db` / `queue` are on the roadmap |
+| `adapters[].type` | — | `soap` or `db` (implemented); `queue` is on the roadmap |
+
+**SOAP adapter config:**
+
+| Key | Default | Meaning |
+|---|---|---|
 | `adapters[].config.wsdl_url` | — | WSDL location (`http(s)://…?wsdl` or a file path) |
 | `adapters[].config.auth` | `{type: none}` | `none` or `{type: basic, username, password_env}` |
 | `adapters[].config.allow_write_operations` | `false` | expose write-like operations |
 | `adapters[].config.include_operations` | all | allowlist of operation names |
 | `adapters[].config.exclude_operations` | `[]` | denylist of operation names |
 | `adapters[].config.timeout_seconds` | `15` | per-call SOAP timeout |
+
+**DB adapter config:**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `adapters[].config.dialect` | — | `postgres`, `mssql`, or `oracle` |
+| `adapters[].config.dsn_env` | — | env var holding the connection string/DSN |
+| `adapters[].config.allow_write_operations` | `false` | expose `insert_<table>` and `write: true` queries |
+| `adapters[].config.timeout_seconds` | `15` | connection timeout |
+| `adapters[].config.tables[].name` / `.schema` | — | table (and optional schema/owner) to allowlist |
+| `adapters[].config.tables[].operations` | `[select]` | `select` and/or `insert` |
+| `adapters[].config.tables[].columns` | all introspected | column allowlist |
+| `adapters[].config.tables[].filterable_columns` | `[]` | columns usable as equality filters on `select_<table>` |
+| `adapters[].config.tables[].max_rows` | `200` | row cap, enforced after the query runs |
+| `adapters[].config.queries[].name` / `.sql` / `.params` | — | a named query; `sql` uses `:param_name` placeholders |
+| `adapters[].config.queries[].write` | `false` | gates this query behind `allow_write_operations` |
+
+**Security config:**
+
+| Key | Default | Meaning |
+|---|---|---|
 | `security.audit.enabled` | `true` | write the audit log |
 | `security.audit.path` | `./legacy2mcp-audit.log` | audit log location |
 
@@ -223,7 +300,8 @@ Call the same generated, validated tools from your own code via any MCP client l
 | Version | Scope | Status |
 |---|---|---|
 | **v0.1** | SOAP/WSDL adapter, schema generation, validation, read-only default, audit log, `run` + `inspect` CLI, basic auth, stdio | ✅ shipped |
-| v0.2 | Database adapter (parameterized-query-only, table/operation allowlists), HTTP/SSE transport, role→tool authorization, OAuth2 for SOAP | planned |
+| **v0.2** | Database adapter (Postgres / SQL Server / Oracle; table/operation allowlists + named parameterized queries, no arbitrary SQL ever) | ✅ shipped |
+| v0.2.x | HTTP/SSE transport, role→tool authorization, OAuth2 for SOAP | planned |
 | v0.3+ | Queue adapter (Kafka/RabbitMQ/SQS), workflow composition with approval gates, OpenTelemetry export | ideas |
 
 Full detail in [docs/roadmap.md](docs/roadmap.md). The [`BaseAdapter`](src/legacy2mcp/adapters/base.py) interface (`discover_tools()` + `invoke()`) is the extension point — the server core handles validation, dispatch and audit for any adapter.
@@ -232,8 +310,14 @@ Full detail in [docs/roadmap.md](docs/roadmap.md). The [`BaseAdapter`](src/legac
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v          # runs against an in-process mock SOAP service — no network
+pytest tests/ -v
 ```
+
+Tests run against an in-process mock SOAP service and an in-process SQLite-backed
+stand-in for the DB adapter — no network, no real Postgres/SQL Server/Oracle
+required. The DB adapter's Postgres/SQL Server/Oracle dialects (`db_dialects.py`)
+have their SQL-translation logic covered by driver-free unit tests; connecting to
+a real instance of each is not part of the default suite.
 
 CI runs the suite on Python 3.10–3.12 ([`ci.yml`](.github/workflows/ci.yml)). Releases to PyPI and the MCP Registry are tag-triggered — see [docs/releasing.md](docs/releasing.md). The demo GIF is regenerated with `vhs demo/demo.tape` ([`demo/`](demo/)).
 

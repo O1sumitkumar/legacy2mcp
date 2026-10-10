@@ -19,19 +19,24 @@
   (dry-run tool discovery, no server started -- useful in CI to catch
   a broken WSDL before deploying).
 
-## v0.2 (planned, not implemented)
+## v0.2
 
-- **Database adapter** (`type: db`): introspect a Postgres/SQL
-  Server/Oracle schema and expose `select_<table>` / `insert_<table>`
-  tools for an explicit allowlist of tables and operations, plus
-  named parameterized queries defined in config. No arbitrary SQL
-  from the LLM, ever -- this is a hard design constraint, not a
-  configurable option.
+- **Database adapter** (`type: db`) -- ✅ shipped: introspects a live
+  Postgres / SQL Server / Oracle schema and exposes `select_<table>` /
+  `insert_<table>` tools for an explicit allowlist of tables and
+  operations, plus named parameterized queries defined in config. No
+  arbitrary SQL from the LLM, ever -- the LLM only ever supplies
+  placeholder values for a query someone wrote into config, never SQL
+  text. `insert_<table>` and write-marked named queries additionally
+  require `allow_write_operations: true`. Postgres is the
+  best-exercised dialect; SQL Server (`pyodbc`) and Oracle
+  (`oracledb`) share the same adapter and safety model but have less
+  real-world mileage -- see `docs/security.md`.
 - **HTTP/SSE transport**, for MCP clients that talk HTTP instead of
-  spawning a stdio subprocess.
+  spawning a stdio subprocess. (planned, not implemented)
 - Fine-grained authorization: map an identity's role or attributes to
-  an allowed tool-name pattern (`select_*`, `get_*`, etc.).
-- OAuth2 auth for SOAP endpoints (basic auth only in v0.1).
+  an allowed tool-name pattern (`select_*`, `get_*`, etc.). (planned)
+- OAuth2 auth for SOAP endpoints (basic auth only today). (planned)
 
 ## v0.3+ (ideas, unscheduled)
 

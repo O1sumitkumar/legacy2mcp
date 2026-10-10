@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "legacy2mcp"
 version = "0.1.0"
-description = "Turn legacy SOAP/WSDL systems into safe, typed, audit-logged MCP servers for AI agents."
+description = "Turn legacy SOAP/WSDL systems and databases into safe, typed, audit-logged MCP servers for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -13,6 +13,7 @@ authors = [{ name = "Balaji Venkatasubramaniyar" }]
 keywords = [
     "mcp", "model-context-protocol", "soap", "wsdl", "ai-agents", "llm",
     "legacy-modernization", "enterprise-integration", "zeep", "claude",
+    "database", "postgres", "sql-server", "oracle",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -40,6 +41,11 @@ dev = [
     "flask>=3.0",
     "lxml>=5.0",
 ]
+# DB adapter drivers -- install only the one(s) you need. Core install has
+# no DB driver dependency; the adapter imports these lazily per dialect.
+db-postgres = ["psycopg[binary]>=3.1,<4"]
+db-mssql = ["pyodbc>=5.0,<6"]
+db-oracle = ["oracledb>=2.0,<3"]
 
 [project.urls]
 Homepage = "https://github.com/bvenkata/legacy2mcp"

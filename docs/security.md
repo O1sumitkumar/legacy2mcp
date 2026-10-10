@@ -1,8 +1,38 @@
-# Security model (v0.1)
+# Security model
 
 This document says plainly what protections exist today and what
 doesn't, so you can make an informed decision about where to point
 this at.
+
+## DB adapter (v0.2)
+
+1. **No arbitrary SQL from the LLM, ever.** This is a hard design
+   constraint, not a configurable option. The LLM can only call
+   `select_<table>` / `insert_<table>` for tables explicitly
+   allowlisted in config, or a named `query_<name>` tool whose SQL
+   text was written by whoever owns the config file -- the LLM only
+   ever supplies the placeholder *values* a named query declares in
+   `params`, never SQL text.
+2. **Columns are introspected from the live schema**, not
+   hand-maintained in config, so a tool's JSON Schema can't silently
+   drift from what the table actually looks like.
+3. **Inserts and write-marked named queries require
+   `allow_write_operations: true`** on top of being explicitly listed
+   -- the same "read-only by default, explicit opt-in for writes"
+   posture as the SOAP adapter's `allow_write_operations` flag.
+4. **Connection strings never live in the config file.** They're read
+   from an environment variable named in `dsn_env`.
+5. **Row counts are capped** (`max_rows` per table/query) and enforced
+   in the adapter after the query runs, as a safety cap against an
+   unexpectedly huge result set -- not a pagination feature.
+
+What it does *not* do yet: no column-level data masking (if a column
+is allowlisted, its values are returned as-is), no query timeout
+enforcement beyond the driver's own connect timeout, and the
+SQL Server / Oracle dialects have less real-world testing than
+Postgres (see `src/legacy2mcp/adapters/db_dialects.py`) -- review the
+generated `inspect` output against your actual schema before trusting
+it in production.
 
 ## What v0.1 actually does
 

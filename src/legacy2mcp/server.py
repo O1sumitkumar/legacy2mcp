@@ -22,6 +22,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
 from legacy2mcp.adapters.base import AdapterError, BaseAdapter, ToolDefinition
+from legacy2mcp.adapters.db_adapter import DbAdapter
 from legacy2mcp.adapters.soap_adapter import SoapAdapter
 from legacy2mcp.config import AdapterConfig, Legacy2McpConfig
 from legacy2mcp.security.audit import AuditLogger
@@ -33,9 +34,11 @@ logger = logging.getLogger("legacy2mcp.server")
 def build_adapter(adapter_config: AdapterConfig) -> BaseAdapter:
     if adapter_config.type == "soap":
         return SoapAdapter(adapter_config.id, adapter_config.soap_settings())
-    if adapter_config.type in ("db", "queue"):
+    if adapter_config.type == "db":
+        return DbAdapter(adapter_config.id, adapter_config.db_settings())
+    if adapter_config.type == "queue":
         raise NotImplementedError(
-            f"Adapter type '{adapter_config.type}' is on the roadmap (see docs/roadmap.md) "
+            f"Adapter type 'queue' is on the roadmap (see docs/roadmap.md) "
             f"but not implemented in this version of legacy2mcp. "
             f"Adapter '{adapter_config.id}' cannot be started."
         )

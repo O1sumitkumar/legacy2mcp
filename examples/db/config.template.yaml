@@ -1,0 +1,84 @@
+# ---------------------------------------------------------------------------
+# Production-shaped template: exposing a legacy database to an AI agent
+# as an MCP server. Dialect can be "postgres", "mssql", or "oracle" --
+# the adapter and safety model are the same across all three; only the
+# driver and a couple of SQL dialect details differ under the hood.
+#
+# No arbitrary SQL from the LLM, ever: it can only call select_<table> /
+# insert_<table> for tables explicitly listed below, or a query_<name>
+# tool whose SQL you write here -- the LLM only ever supplies the
+# placeholder values a query's `params` declare, never SQL text.
+#
+#     pip install "legacy2mcp[db-postgres]"   # or db-mssql / db-oracle
+#     export ORDERS_DB_DSN=...
+#     legacy2mcp inspect --config config.yaml   # dry-run: list the tools
+#     legacy2mcp run     --config config.yaml   # start the MCP server
+# ---------------------------------------------------------------------------
+
+server:
+  name: legacy-mcp
+  transport: stdio
+
+adapters:
+  - id: orders
+    type: db
+    enabled: true
+    config:
+      dialect: postgres  # postgres | mssql | oracle
+
+      # Connection string / DSN, read from this environment variable at
+      # startup -- never put it in this file.
+      #   postgres: "postgresql://user:pass@host:5432/dbname"
+      #   mssql:    an ODBC connection string (pyodbc)
+      #   oracle:   an oracledb-style DSN ("user/pass@host:port/service")
+      dsn_env: "ORDERS_DB_DSN"
+
+      # Safe by default: insert_<table> and any query below marked
+      # write: true are NOT exposed unless this is true. Leave it
+      # false unless the agent genuinely needs to mutate the database.
+      allow_write_operations: false
+
+      timeout_seconds: 15
+
+      tables:
+        - name: orders
+          schema: public          # optional; omit to use the driver's default
+          operations: [select]    # [select] or [select, insert]
+          # Column allowlist. Omit entirely to expose every introspected
+          # column -- recommended to set this explicitly for any table
+          # with columns the agent shouldn't see (PII, internal flags, ...).
+          columns: [id, status, total, created_at]
+          # Subset of `columns` the agent can filter select_orders by
+          # (equality only). Everything else is read-only output.
+          filterable_columns: [status]
+          max_rows: 200
+
+      # Named, parameterized queries for anything a plain table
+      # read/write can't express (joins, aggregates, ordering). The SQL
+      # is yours -- write it with `:param_name` placeholders; the LLM
+      # never sees or writes SQL, only the declared param values.
+      queries:
+        - name: orders_by_status_since
+          sql: >
+            SELECT id, status, total, created_at
+            FROM orders
+            WHERE status = :status AND created_at >= :since
+            ORDER BY created_at DESC
+          description: "Orders in a given status created on or after a date."
+          params:
+            - name: status
+              type: string
+              required: true
+            - name: since
+              type: string   # ISO date/datetime string
+              required: true
+          max_rows: 100
+          write: false
+
+security:
+  audit:
+    enabled: true
+    # One JSON line per tool call (who / what / when / args / outcome).
+    # Point this at a path with restricted permissions -- arguments may
+    # contain business data.
+    path: "/var/log/legacy2mcp/audit.log"
