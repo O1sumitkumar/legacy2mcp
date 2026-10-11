@@ -24,6 +24,25 @@ python examples/soap/run_mock_calculator.py
 legacy2mcp inspect --config examples/soap/config.calculator.yaml
 ```
 
+Or with Docker:
+
+```bash
+docker compose up demo-soap-service -d
+docker compose run --rm legacy2mcp legacy2mcp inspect \
+  --config examples/soap/config.calculator.docker.yaml
+```
+
+### Try the WSDL-by-URL variant (no cloning)
+
+`inspect` only needs the WSDL itself, so you can point it at this repo's raw
+GitHub URL instead of cloning. It can list tools but not call them, since
+the WSDL's bound address is local:
+
+```bash
+curl -O https://raw.githubusercontent.com/bvenkata/legacy2mcp/main/examples/soap/config.orders.public-wsdl.yaml
+legacy2mcp inspect --config config.orders.public-wsdl.yaml
+```
+
 ### Point it at your own WSDL
 
 1. Copy `soap/config.template.yaml` to `config.yaml`.

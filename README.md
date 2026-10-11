@@ -59,59 +59,33 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-No API key, no cloning, no local setup — point `legacy2mcp init` at a real,
-public REST API (it tries OpenAPI/Swagger discovery against it) and
-generate a working config in one command:
+Two zero-setup demos. Pick one:
+
+**REST** — no cloning, no local server, just a public API:
 
 ```bash
+pip install legacy2mcp
 legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
 legacy2mcp inspect --config config.yaml   # see the generated MCP tools
 ```
 
-Or run it with no flags for the interactive menu (WSDL URL / REST API URL /
-GitHub repo) — see [Generate a config automatically](#generate-a-config-automatically)
-for what each option does and when it needs an API key (hint: none of them
-need one unless you're pointing it at a GitHub repo and want AI-assisted
-help with ambiguous code):
+**SOAP** — runs a sample service locally, so you can also see writes get hidden:
 
 ```bash
-legacy2mcp init
+git clone https://github.com/bvenkata/legacy2mcp.git && cd legacy2mcp
+pip install -e ".[dev]"
+python examples/soap/mock_orders_service.py &
+legacy2mcp inspect --config examples/soap/config.orders.yaml
 ```
 
-### Demo targets (nothing of your own required)
-
-| Demo | Setup | What you get |
-|---|---|---|
-| **REST: public Swagger Petstore** | none → [`examples/rest/config.petstore.yaml`](examples/rest/config.petstore.yaml) | 4 read tools; `delete_pet` hidden as a write |
-| **SOAP: sample Orders WSDL** | `python examples/soap/mock_orders_service.py` → [`config.orders.yaml`](examples/soap/config.orders.yaml) | `GetOrder`, `ListOrders`, `GetInventory`; `CreateOrder` / `CancelOrder` hidden as writes |
-| **SOAP: WSDL by URL** | none → [`config.orders.public-wsdl.yaml`](examples/soap/config.orders.public-wsdl.yaml) points at the sample WSDL in this repo | tool discovery with `inspect` (no calls) |
-
-Hook any of them up to Claude Desktop, Claude Code or Cursor with the snippets in
+Both print the generated MCP tools. Next, connect one to your AI client — see
 [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
 
-<details>
-<summary>Prefer a fully offline demo? Run the bundled mock SOAP service</summary>
-
-```bash
-git clone https://github.com/bvenkata/legacy2mcp.git
-cd legacy2mcp
-pip install -e ".[dev]"
-
-# 1. start the demo SOAP service (dneonline-style Calculator WSDL)
-python examples/soap/run_mock_calculator.py &
-
-# 2. see the MCP tools generated from its WSDL
-legacy2mcp inspect --config examples/soap/config.calculator.yaml
-```
-
-Or with Docker:
-
-```bash
-docker compose up demo-soap-service -d
-docker compose run --rm legacy2mcp legacy2mcp inspect \
-  --config examples/soap/config.calculator.docker.yaml
-```
-</details>
+Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
+flags) walks you through it — see
+[Generate a config automatically](#generate-a-config-automatically). A few
+more demo variants (Docker, a WSDL served by raw URL) are listed in
+[examples/](examples/README.md).
 
 ## How it works
 
