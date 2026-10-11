@@ -34,6 +34,36 @@ Postgres (see `src/legacy2mcp/adapters/db_dialects.py`) -- review the
 generated `inspect` output against your actual schema before trusting
 it in production.
 
+## REST adapter + `legacy2mcp init`
+
+1. **There is no live schema for a plain REST API** the way there is a
+   WSDL or a database catalog -- the `rest` adapter trusts its config's
+   endpoint list, method, path, and param shapes as-is. Nothing about a
+   hand-written or `legacy2mcp init`-generated `config.yaml` is verified
+   against the real backend until you actually call it.
+2. **`legacy2mcp init`'s read/write classification is a heuristic, not
+   semantic analysis**, same caveat as the SOAP adapter's write-verb
+   check: it defaults to "non-`GET` is a write", optionally refined by an
+   LLM's best guess from the route name/path/params. A `GET` endpoint
+   that mutates state, or a `POST` that's actually a search, would not be
+   caught. Review every `write:` flag in the generated file -- it only
+   ever controls what *could* be exposed; `allow_write_operations` always
+   generates as `false`.
+3. **Parameter types the scanner couldn't confidently infer default to
+   `string`** and are left as a `# TODO` in the generated file, not
+   silently guessed as something more specific.
+4. **The LLM step, when enabled, sends only the already-detected
+   endpoint names/paths/params it flagged as ambiguous** to the
+   configured OpenAI-compatible API -- never a dump of the repo's
+   source. It's still a third-party API call; use `--scan-only` if that
+   repo's structure itself shouldn't leave your machine.
+5. **The LLM API key and any GitHub token are read from an environment
+   variable name, or typed at a hidden interactive prompt** -- never as
+   a plain CLI argument, and never written to the generated config or
+   to disk.
+6. **`legacy2mcp init` clones the target repo and parses it with `ast`
+   only** -- it never executes any code from the scanned repo.
+
 ## What v0.1 actually does
 
 1. **Every tool call is validated against a JSON Schema before it

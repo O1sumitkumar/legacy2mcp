@@ -23,6 +23,7 @@ from mcp.server.stdio import stdio_server
 
 from legacy2mcp.adapters.base import AdapterError, BaseAdapter, ToolDefinition
 from legacy2mcp.adapters.db_adapter import DbAdapter
+from legacy2mcp.adapters.rest_adapter import RestAdapter
 from legacy2mcp.adapters.soap_adapter import SoapAdapter
 from legacy2mcp.config import AdapterConfig, Legacy2McpConfig
 from legacy2mcp.security.audit import AuditLogger
@@ -36,6 +37,8 @@ def build_adapter(adapter_config: AdapterConfig) -> BaseAdapter:
         return SoapAdapter(adapter_config.id, adapter_config.soap_settings())
     if adapter_config.type == "db":
         return DbAdapter(adapter_config.id, adapter_config.db_settings())
+    if adapter_config.type == "rest":
+        return RestAdapter(adapter_config.id, adapter_config.rest_settings())
     if adapter_config.type == "queue":
         raise NotImplementedError(
             f"Adapter type 'queue' is on the roadmap (see docs/roadmap.md) "

@@ -42,7 +42,21 @@ class NoAuthConfig(BaseModel):
     type: Literal["none"] = "none"
 
 
-AuthConfig = BasicAuthConfig | NoAuthConfig
+class BearerAuthConfig(BaseModel):
+    type: Literal["bearer"] = "bearer"
+    token_env: str
+
+    def resolve_token(self) -> str:
+        value = os.environ.get(self.token_env)
+        if value is None:
+            raise ValueError(
+                f"Environment variable '{self.token_env}' is not set "
+                f"(required for bearer auth)."
+            )
+        return value
+
+
+AuthConfig = BasicAuthConfig | BearerAuthConfig | NoAuthConfig
 
 
 class SoapAdapterSettings(BaseModel):
@@ -113,9 +127,44 @@ class DbAdapterSettings(BaseModel):
         return value
 
 
+class RestParamSettings(BaseModel):
+    """One parameter of a REST endpoint, placed into the path, the query
+    string, or a JSON request body at invoke time depending on `location`."""
+
+    name: str
+    location: Literal["path", "query", "body"] = "query"
+    type: Literal["string", "integer", "number", "boolean"] = "string"
+    required: bool = True
+
+
+class RestEndpointSettings(BaseModel):
+    """One allowlisted REST endpoint. Unlike the SOAP/DB adapters there is no
+    live schema to introspect a plain HTTP API from, so the shape here is
+    whatever `legacy2mcp init` discovered from the source (or whatever you
+    write by hand) -- there is nothing else to validate it against."""
+
+    name: str
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
+    # e.g. "/orders/{id}" -- path params are matched against params[].location == "path"
+    path: str
+    description: str = ""
+    params: list[RestParamSettings] = Field(default_factory=list)
+    # Non-GET endpoints also require allow_write_operations, same posture as
+    # the SOAP/DB adapters' write gating.
+    write: bool = False
+
+
+class RestAdapterSettings(BaseModel):
+    base_url: str
+    auth: AuthConfig = Field(default_factory=NoAuthConfig)
+    allow_write_operations: bool = False
+    timeout_seconds: float = 15.0
+    endpoints: list[RestEndpointSettings] = Field(default_factory=list)
+
+
 class AdapterConfig(BaseModel):
     id: str
-    type: Literal["soap", "db", "queue"]
+    type: Literal["soap", "db", "rest", "queue"]
     enabled: bool = True
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -128,6 +177,11 @@ class AdapterConfig(BaseModel):
         if self.type != "db":
             raise ValueError(f"Adapter '{self.id}' is type '{self.type}', not 'db'.")
         return DbAdapterSettings.model_validate(self.config)
+
+    def rest_settings(self) -> RestAdapterSettings:
+        if self.type != "rest":
+            raise ValueError(f"Adapter '{self.id}' is type '{self.type}', not 'rest'.")
+        return RestAdapterSettings.model_validate(self.config)
 
 
 class AuditConfig(BaseModel):

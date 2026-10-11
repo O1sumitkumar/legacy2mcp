@@ -29,3 +29,26 @@ legacy2mcp inspect --config examples/soap/config.calculator.yaml
 4. `legacy2mcp inspect --config config.yaml` to review the generated tools.
 5. `legacy2mcp run --config config.yaml` to start the MCP server, or wire it
    into an MCP client (see the root README).
+
+## REST / JSON APIs
+
+| File | What it shows |
+|------|---------------|
+| [`rest/config.template.yaml`](rest/config.template.yaml) | **Production-shaped template**: a REST API with bearer auth, an explicit endpoint allowlist, and audit logging |
+
+There's no live schema to introspect a plain REST API from the way there is
+a WSDL or a DB catalog, so either write `rest/config.template.yaml` by hand,
+or let `legacy2mcp init` generate a starting point. It asks what to point at
+-- a WSDL URL, a REST API URL (tries OpenAPI/Swagger discovery against it),
+or a GitHub repo/local path (scans Flask/FastAPI route decorators) -- either
+interactively or via a flag:
+
+```bash
+legacy2mcp init --rest-url https://api.example.com --out config.yaml
+# or: --wsdl-url ... / --github-url ... --scan-only (skip AI assist)
+# review config.yaml -- especially base_url, auth, and any TODOs it left
+legacy2mcp inspect --config config.yaml
+```
+
+See [the root README](../README.md#point-it-at-your-own-rest-api) for the
+full `legacy2mcp init` flags.

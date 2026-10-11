@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Production-shaped template: exposing a plain REST/JSON API to an AI agent
+# as an MCP server. Unlike the SOAP/DB adapters, there's no WSDL or live
+# database schema to introspect a REST API from -- the endpoint list and
+# parameter shapes below are either written by hand, or generated for you
+# by `legacy2mcp init` scanning a repo's Flask/FastAPI route decorators.
+#
+#     legacy2mcp init --github-url https://github.com/you/your-api
+#     legacy2mcp inspect --config config.yaml   # dry-run: list the tools
+#     legacy2mcp run     --config config.yaml   # start the MCP server
+# ---------------------------------------------------------------------------
+
+server:
+  name: legacy-mcp
+  transport: stdio
+
+adapters:
+  - id: orders
+    type: rest
+    enabled: true
+    config:
+      base_url: "https://api.example.com"
+
+      # none | {type: basic, username, password_env} | {type: bearer, token_env}
+      auth:
+        type: bearer
+        token_env: "ORDERS_API_TOKEN"
+
+      # Safe by default: endpoints marked `write: true` are NOT exposed
+      # unless this is true. Leave it false unless the agent genuinely
+      # needs to mutate data through this API.
+      allow_write_operations: false
+
+      timeout_seconds: 15
+
+      endpoints:
+        - name: list_orders
+          method: GET
+          path: "/orders"
+          description: "List orders, optionally filtered by status."
+          params:
+            - { name: status, location: query, type: string, required: false }
+
+        - name: get_order
+          method: GET
+          path: "/orders/{order_id}"
+          description: "Fetch one order by id."
+          params:
+            - { name: order_id, location: path, type: integer, required: true }
+
+        - name: create_order
+          method: POST
+          path: "/orders"
+          description: "Create a new order."
+          write: true
+          params:
+            - { name: total, location: body, type: number, required: true }
+
+security:
+  audit:
+    enabled: true
+    path: "/var/log/legacy2mcp/audit.log"

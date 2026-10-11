@@ -31,6 +31,8 @@
 - [How it works](#how-it-works)
 - [Point it at your own WSDL](#point-it-at-your-own-wsdl)
 - [Point it at your own database](#point-it-at-your-own-database)
+- [Point it at your own REST API](#point-it-at-your-own-rest-api)
+- [Generate a config automatically](#generate-a-config-automatically)
 - [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client)
 - [What's handled](#whats-handled)
 - [Safety model](#safety-model)
@@ -43,6 +45,12 @@
 ## Install
 
 ```bash
+# Full install (recommended)
+pip install "legacy2mcp[ai]"
+
+# Or the identical, scan-only-ready core -- AI-assisted `legacy2mcp init`
+# needs no extra package either way, just an API key at runtime; `[ai]`
+# above installs nothing extra today, it's just a stable, familiar name
 pip install legacy2mcp
 # or:  uv tool install legacy2mcp   ·   pipx install legacy2mcp
 ```
@@ -51,7 +59,27 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-Try it end-to-end against the bundled mock SOAP service — no external network, no real backend:
+No API key, no cloning, no local setup — point `legacy2mcp init` at a real,
+public REST API (it tries OpenAPI/Swagger discovery against it) and
+generate a working config in one command:
+
+```bash
+legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
+legacy2mcp inspect --config config.yaml   # see the generated MCP tools
+```
+
+Or run it with no flags for the interactive menu (WSDL URL / REST API URL /
+GitHub repo) — see [Generate a config automatically](#generate-a-config-automatically)
+for what each option does and when it needs an API key (hint: none of them
+need one unless you're pointing it at a GitHub repo and want AI-assisted
+help with ambiguous code):
+
+```bash
+legacy2mcp init
+```
+
+<details>
+<summary>Prefer a fully offline demo? Run the bundled mock SOAP service</summary>
 
 ```bash
 git clone https://github.com/bvenkata/legacy2mcp.git
@@ -65,8 +93,7 @@ python examples/soap/run_mock_calculator.py &
 legacy2mcp inspect --config examples/soap/config.calculator.yaml
 ```
 
-<details>
-<summary>Or with Docker</summary>
+Or with Docker:
 
 ```bash
 docker compose up demo-soap-service -d
@@ -177,6 +204,98 @@ tables listed under `tables:`, or a `query_<name>` tool whose SQL you wrote unde
 never SQL text. A production-shaped template lives at
 [`examples/db/config.template.yaml`](examples/db/config.template.yaml).
 
+## Point it at your own REST API
+
+There's no WSDL or live database schema to introspect a plain REST/JSON API
+from, so the `rest` adapter's endpoint list is explicit config -- write it
+by hand, or generate a starting point with `legacy2mcp init` (next
+section).
+
+```yaml
+# config.yaml
+adapters:
+  - id: orders
+    type: rest
+    config:
+      base_url: "https://api.example.com"
+      auth:
+        type: bearer
+        token_env: "ORDERS_API_TOKEN"
+      allow_write_operations: false
+      endpoints:
+        - name: get_order
+          method: GET
+          path: "/orders/{order_id}"
+          params:
+            - { name: order_id, location: path, type: integer, required: true }
+        - name: create_order
+          method: POST
+          path: "/orders"
+          write: true   # stays hidden unless allow_write_operations: true
+          params:
+            - { name: total, location: body, type: number, required: true }
+```
+
+A production-shaped template lives at
+[`examples/rest/config.template.yaml`](examples/rest/config.template.yaml).
+
+> [!NOTE]
+> Both a non-`GET` method and an LLM-assisted classification are
+> heuristics, not a guarantee the endpoint is actually safe to call
+> unsupervised -- review `write:` flags and `allow_write_operations` before
+> running against a real backend, same caveat as the SOAP adapter's
+> write-verb heuristic below.
+
+## Generate a config automatically
+
+`legacy2mcp init` asks what to point it at, then writes a starting
+`config.yaml` for you:
+
+```bash
+legacy2mcp init
+```
+
+```
+What do you want to point legacy2mcp at?
+  1) WSDL URL (SOAP service)
+  2) REST API URL (tries OpenAPI/Swagger discovery)
+  3) GitHub repo URL or a local path to its source code
+Choice [1-3]:
+```
+
+| Option | What happens | Needs an LLM key? |
+|---|---|---|
+| **WSDL URL** | Points a `soap` adapter at it directly -- `zeep` introspects the live WSDL at `inspect`/`run` time anyway, so nothing needs scanning up front. | No |
+| **REST API URL** | Tries the common OpenAPI/Swagger spec locations (`/openapi.json`, `/swagger.json`, ...) against that URL and builds the `rest` adapter's endpoint list from the real spec if one's found; an empty scaffold otherwise. | No |
+| **GitHub repo / local path** | Clones (or reads) the repo and statically scans its Python source (AST only, never executed) for a `zeep.Client(...)` call, a SQLAlchemy/Flask-SQLAlchemy model, or Flask/FastAPI routes -- picking `soap`/`db`/`rest` accordingly. | Optional |
+
+Each also works non-interactively via a flag -- `--wsdl-url`, `--rest-url`,
+`--github-url`, or `--local-path` -- for scripting or CI. Only the GitHub/
+source-code path can use an LLM, and only to refine what static analysis
+already found (ambiguous parameter types, read-vs-write classification) --
+never a dump of your repo. It needs no extra dependency, just an
+OpenAI-compatible API key via `--llm-api-key-env`, or an interactive hidden
+prompt if you omit that (never written to disk); pass `--scan-only` to skip
+it outright and run static-analysis-only, same as not entering a key.
+
+```bash
+legacy2mcp init --github-url https://github.com/you/your-api --scan-only --out config.yaml
+```
+
+Whichever path you take, review the generated file before running it --
+it's marked up with `# TODO` comments for anything that couldn't be
+confidently inferred (an unresolved `base_url`, an unverified param type,
+which endpoints got classified `write: true`), and nothing in it is
+verified against the real backend until you do:
+
+```bash
+legacy2mcp inspect --config config.yaml   # review the generated tools
+legacy2mcp run     --config config.yaml   # start the MCP server
+```
+
+See [docs/security.md](docs/security.md) for exactly what this heuristic
+does and doesn't guarantee before pointing it at anything real.
+
 ## Use it from Claude Desktop (or any MCP client)
 
 ```json
@@ -199,9 +318,10 @@ never SQL text. A production-shaped template lives at
 | **Discovery** | every service → port → binding → operation; duplicate tool names rejected at startup |
 | **Invocation** | argument validation, `zeep` call, response serialized to plain JSON, single-field responses re-wrapped to a named result |
 | **Errors** | SOAP faults and transport errors caught and returned as clean messages — no stack traces to the caller |
-| **Auth** | HTTP basic (username + `*_env` password); anonymous |
+| **Auth** | HTTP basic (username + `*_env` password); bearer token (`*_env`); anonymous |
 | **Transport** | `stdio` (the transport Claude Desktop and most agent frameworks spawn) |
 | **DB dialects** | Postgres, SQL Server, Oracle — table allowlist (`select`/`insert`) with live schema introspection, plus named parameterized queries |
+| **REST** | explicit endpoint allowlist (method + path + typed params) from config or `legacy2mcp init` — no live schema to introspect, so nothing here is verified until you run it |
 
 See [docs/security.md](docs/security.md) for the full, honest security model — what's covered today and what isn't yet.
 
@@ -259,7 +379,7 @@ Call the same generated, validated tools from your own code via any MCP client l
 | `server.name` | `legacy2mcp` | MCP server name reported to clients |
 | `server.transport` | `stdio` | only `stdio` is implemented so far |
 | `adapters[].id` | — | prefix for this adapter's tool names |
-| `adapters[].type` | — | `soap` or `db` (implemented); `queue` is on the roadmap |
+| `adapters[].type` | — | `soap`, `db`, or `rest` (implemented); `queue` is on the roadmap |
 
 **SOAP adapter config:**
 
@@ -288,6 +408,18 @@ Call the same generated, validated tools from your own code via any MCP client l
 | `adapters[].config.queries[].name` / `.sql` / `.params` | — | a named query; `sql` uses `:param_name` placeholders |
 | `adapters[].config.queries[].write` | `false` | gates this query behind `allow_write_operations` |
 
+**REST adapter config:**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `adapters[].config.base_url` | — | base URL the configured endpoints are relative to |
+| `adapters[].config.auth` | `{type: none}` | `none`, `{type: basic, username, password_env}`, or `{type: bearer, token_env}` |
+| `adapters[].config.allow_write_operations` | `false` | expose endpoints marked `write: true` |
+| `adapters[].config.timeout_seconds` | `15` | per-call HTTP timeout |
+| `adapters[].config.endpoints[].name` / `.method` / `.path` / `.description` | — | one allowlisted endpoint; `path` uses `{param}` placeholders for path params |
+| `adapters[].config.endpoints[].params[].name` / `.location` / `.type` / `.required` | — | `location` is `path`, `query`, or `body` |
+| `adapters[].config.endpoints[].write` | `false` | gates this endpoint behind `allow_write_operations` |
+
 **Security config:**
 
 | Key | Default | Meaning |
@@ -301,6 +433,7 @@ Call the same generated, validated tools from your own code via any MCP client l
 |---|---|---|
 | **v0.1** | SOAP/WSDL adapter, schema generation, validation, read-only default, audit log, `run` + `inspect` CLI, basic auth, stdio | ✅ shipped |
 | **v0.2** | Database adapter (Postgres / SQL Server / Oracle; table/operation allowlists + named parameterized queries, no arbitrary SQL ever) | ✅ shipped |
+| **v0.2.x** | REST adapter (explicit endpoint allowlist); `legacy2mcp init` -- scans a repo (SOAP client / ORM models / Flask/FastAPI routes) and generates a starter config, with optional OpenAI-compatible LLM assist for ambiguous bits | ✅ shipped |
 | v0.2.x | HTTP/SSE transport, role→tool authorization, OAuth2 for SOAP | planned |
 | v0.3+ | Queue adapter (Kafka/RabbitMQ/SQS), workflow composition with approval gates, OpenTelemetry export | ideas |
 
