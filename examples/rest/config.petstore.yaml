@@ -1,0 +1,66 @@
+# Zero-setup REST demo against the public Swagger Petstore (OpenAPI 3).
+# No API key, no signup, nothing to run locally.
+#
+#   legacy2mcp inspect --config examples/rest/config.petstore.yaml
+#   legacy2mcp run     --config examples/rest/config.petstore.yaml
+#
+# Four read endpoints become MCP tools. `delete_pet` is marked write: true, so
+# it stays hidden unless you set allow_write_operations: true.
+#
+# Prefer to generate this from the live spec instead of hand-writing it?
+#   legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
+
+server:
+  name: legacy2mcp-petstore-demo
+  transport: stdio
+
+adapters:
+  - id: petstore
+    type: rest
+    enabled: true
+    config:
+      base_url: "https://petstore3.swagger.io/api/v3"
+      auth:
+        type: none
+      allow_write_operations: false
+      timeout_seconds: 15
+      endpoints:
+        - name: find_pets_by_status
+          method: GET
+          path: "/pet/findByStatus"
+          description: "Find pets by status (available, pending, or sold)."
+          params:
+            - { name: status, location: query, type: string, required: true }
+
+        - name: get_pet_by_id
+          method: GET
+          path: "/pet/{petId}"
+          description: "Fetch one pet by id."
+          params:
+            - { name: petId, location: path, type: integer, required: true }
+
+        - name: get_inventory
+          method: GET
+          path: "/store/inventory"
+          description: "Pet inventory counts by status."
+          params: []
+
+        - name: get_order_by_id
+          method: GET
+          path: "/store/order/{orderId}"
+          description: "Fetch one store order by id."
+          params:
+            - { name: orderId, location: path, type: integer, required: true }
+
+        - name: delete_pet
+          method: DELETE
+          path: "/pet/{petId}"
+          description: "Delete a pet (write operation)."
+          write: true
+          params:
+            - { name: petId, location: path, type: integer, required: true }
+
+security:
+  audit:
+    enabled: true
+    path: "./legacy2mcp-audit.log"

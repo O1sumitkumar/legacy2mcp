@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sample "Orders" WSDL for trying legacy2mcp without your own legacy system.
+
+  Read operations:  GetOrder, ListOrders, GetInventory
+  Write operations: CreateOrder, CancelOrder (hidden by default; legacy2mcp
+                    excludes write-like operations unless you opt in)
+
+  `legacy2mcp inspect` only needs this WSDL, so you can point it straight at the
+  raw GitHub URL of this file. To also call the tools, start the matching mock
+  service:  python examples/soap/mock_orders_service.py
+-->
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:tns="http://legacy2mcp.example/orders"
+                  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                  targetNamespace="http://legacy2mcp.example/orders">
+
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://legacy2mcp.example/orders" elementFormDefault="qualified">
+
+
+      <xsd:complexType name="OrderItem">
+        <xsd:sequence>
+          <xsd:element name="sku" type="xsd:string"/>
+          <xsd:element name="qty" type="xsd:int"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <xsd:complexType name="Order">
+        <xsd:sequence>
+          <xsd:element name="orderId" type="xsd:int"/>
+          <xsd:element name="customer" type="xsd:string"/>
+          <xsd:element name="status" type="xsd:string"/>
+          <xsd:element name="total" type="xsd:decimal"/>
+          <xsd:element name="items" type="tns:OrderItem" minOccurs="0" maxOccurs="unbounded"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <!-- GetOrder -->
+      <xsd:element name="GetOrder">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="orderId" type="xsd:int"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="GetOrderResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="order" type="tns:Order"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+
+      <!-- ListOrders -->
+      <xsd:element name="ListOrders">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="status" type="xsd:string" minOccurs="0"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="ListOrdersResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="orders" type="tns:Order" minOccurs="0" maxOccurs="unbounded"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+
+      <!-- GetInventory -->
+      <xsd:element name="GetInventory">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="sku" type="xsd:string"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="GetInventoryResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="sku" type="xsd:string"/>
+          <xsd:element name="onHand" type="xsd:int"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+
+      <!-- CreateOrder (write) -->
+      <xsd:element name="CreateOrder">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="customer" type="xsd:string"/>
+          <xsd:element name="sku" type="xsd:string"/>
+          <xsd:element name="qty" type="xsd:int"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="CreateOrderResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="orderId" type="xsd:int"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+
+      <!-- CancelOrder (write) -->
+      <xsd:element name="CancelOrder">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="orderId" type="xsd:int"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="CancelOrderResponse">
+        <xsd:complexType><xsd:sequence>
+          <xsd:element name="cancelled" type="xsd:boolean"/>
+        </xsd:sequence></xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </wsdl:types>
+
+  <wsdl:message name="GetOrderIn"><wsdl:part name="parameters" element="tns:GetOrder"/></wsdl:message>
+  <wsdl:message name="GetOrderOut"><wsdl:part name="parameters" element="tns:GetOrderResponse"/></wsdl:message>
+  <wsdl:message name="ListOrdersIn"><wsdl:part name="parameters" element="tns:ListOrders"/></wsdl:message>
+  <wsdl:message name="ListOrdersOut"><wsdl:part name="parameters" element="tns:ListOrdersResponse"/></wsdl:message>
+  <wsdl:message name="GetInventoryIn"><wsdl:part name="parameters" element="tns:GetInventory"/></wsdl:message>
+  <wsdl:message name="GetInventoryOut"><wsdl:part name="parameters" element="tns:GetInventoryResponse"/></wsdl:message>
+  <wsdl:message name="CreateOrderIn"><wsdl:part name="parameters" element="tns:CreateOrder"/></wsdl:message>
+  <wsdl:message name="CreateOrderOut"><wsdl:part name="parameters" element="tns:CreateOrderResponse"/></wsdl:message>
+  <wsdl:message name="CancelOrderIn"><wsdl:part name="parameters" element="tns:CancelOrder"/></wsdl:message>
+  <wsdl:message name="CancelOrderOut"><wsdl:part name="parameters" element="tns:CancelOrderResponse"/></wsdl:message>
+
+  <wsdl:portType name="OrdersSoap">
+    <wsdl:operation name="GetOrder">
+      <wsdl:documentation>Fetch one order by id.</wsdl:documentation>
+      <wsdl:input message="tns:GetOrderIn"/>
+      <wsdl:output message="tns:GetOrderOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="ListOrders">
+      <wsdl:documentation>List orders, optionally filtered by status (pending, shipped, delivered, or cancelled).</wsdl:documentation>
+      <wsdl:input message="tns:ListOrdersIn"/>
+      <wsdl:output message="tns:ListOrdersOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="GetInventory">
+      <wsdl:documentation>Units on hand for a SKU.</wsdl:documentation>
+      <wsdl:input message="tns:GetInventoryIn"/>
+      <wsdl:output message="tns:GetInventoryOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="CreateOrder">
+      <wsdl:documentation>Create a new order (write operation).</wsdl:documentation>
+      <wsdl:input message="tns:CreateOrderIn"/>
+      <wsdl:output message="tns:CreateOrderOut"/>
+    </wsdl:operation>
+    <wsdl:operation name="CancelOrder">
+      <wsdl:documentation>Cancel an order (write operation).</wsdl:documentation>
+      <wsdl:input message="tns:CancelOrderIn"/>
+      <wsdl:output message="tns:CancelOrderOut"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <wsdl:binding name="OrdersSoap" type="tns:OrdersSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="GetOrder">
+      <soap:operation soapAction="http://legacy2mcp.example/orders/GetOrder"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="ListOrders">
+      <soap:operation soapAction="http://legacy2mcp.example/orders/ListOrders"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetInventory">
+      <soap:operation soapAction="http://legacy2mcp.example/orders/GetInventory"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CreateOrder">
+      <soap:operation soapAction="http://legacy2mcp.example/orders/CreateOrder"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="CancelOrder">
+      <soap:operation soapAction="http://legacy2mcp.example/orders/CancelOrder"/>
+      <wsdl:input><soap:body use="literal"/></wsdl:input>
+      <wsdl:output><soap:body use="literal"/></wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="Orders">
+    <wsdl:port name="OrdersSoap" binding="tns:OrdersSoap">
+      <soap:address location="http://127.0.0.1:8124/orders"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
