@@ -1,5 +1,7 @@
 <!-- mcp-name: io.github.bvenkata/legacy2mcp -->
 
+# legacy2mcp
+
 <div align="center">
 
 <img src="assets/banner.svg" alt="legacy2mcp — legacy SOAP/WSDL turned into safe, typed MCP tools" width="820">
@@ -13,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
-<p><b>From a legacy SOAP/WSDL service, database, or REST API to a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
+<p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, or REST API into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
 <img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
 
