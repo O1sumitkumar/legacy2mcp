@@ -29,6 +29,7 @@
 - [Install](#install)
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
+- [Why not just write an adapter by hand?](#why-not-just-write-an-adapter-by-hand)
 - [Point it at your own WSDL](#point-it-at-your-own-wsdl)
 - [Point it at your own database](#point-it-at-your-own-database)
 - [Point it at your own REST API](#point-it-at-your-own-rest-api)
@@ -59,8 +60,15 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-No API key, no cloning — the three commands above run against a public demo
-API. Next, connect it to your AI client — see
+No API key, no cloning — against a public demo API:
+
+```bash
+pip install legacy2mcp
+legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
+legacy2mcp inspect --config config.yaml   # see the generated MCP tools
+```
+
+Next, connect it to your AI client — see
 [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
@@ -94,7 +102,27 @@ flowchart LR
 1. Connects with the dialect's driver (`psycopg` / `pyodbc` / `oracledb`, imported lazily) and introspects the live column types for each allowlisted table ([`adapters/db_dialects.py`](src/legacy2mcp/adapters/db_dialects.py)) into JSON Schema ([`schema/sql_to_jsonschema.py`](src/legacy2mcp/schema/sql_to_jsonschema.py)).
 2. Registers `select_<table>` / `insert_<table>` per allowlisted table-and-operation, plus `query_<name>` per named query in config.
 3. On a tool call: validates arguments, builds SQL from the allowlisted table/columns (or runs the config-supplied named query) using one dialect-neutral `:param` placeholder convention, executes it, and writes an audit entry. The LLM never sees or writes SQL text.
-5. Operations whose names look like writes are excluded unless `allow_write_operations: true`.
+4. Operations whose names look like writes are excluded unless `allow_write_operations: true`.
+
+## Why not just write an adapter by hand?
+
+Because a hand-written adapter is a second copy of your system's schema that
+nobody remembers to update. The first time a WSDL operation's signature
+shifts or a column changes, your tool's JSON Schema silently drifts from
+reality — and an LLM calling it finds out by sending arguments that are
+wrong in a way nothing catches, or by getting a confusing runtime error from
+deep inside the SOAP/DB client. legacy2mcp builds the schema from the live
+system every time it starts, so a drifted call fails at validation, before
+it ever reaches your backend — not after.
+
+| | Hand-written adapter (FastMCP / raw SDK) | Generic OpenAPI-to-MCP proxy | legacy2mcp |
+|---|---|---|---|
+| Schema source | Typed by hand, per tool | The OpenAPI spec, if one exists | The live WSDL / DB schema, or a discovered OpenAPI spec |
+| Can drift from the real system | Yes — nothing re-checks it | Only if the spec itself is stale | No — rebuilt from the live source at startup |
+| Covers SOAP / a database | You write that client code yourself | No — REST/OpenAPI only | Yes, plus REST |
+| Write operations hidden by default | No — you remember to gate each one | No — usually exposes everything the spec defines | Yes — explicit `allow_write_operations` opt-in |
+| Audit log of every call | DIY | Usually no | Built in |
+| Time to a working server | Hours to days, per system | Minutes, for a REST API with a spec | Minutes — `legacy2mcp init` |
 
 ## Point it at your own WSDL
 

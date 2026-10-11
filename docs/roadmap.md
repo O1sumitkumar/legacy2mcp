@@ -1,6 +1,6 @@
 # Roadmap
 
-## v0.1 (this release)
+## v0.1
 
 - SOAP/WSDL adapter: introspects any WSDL via `zeep`, generates one MCP
   tool per operation with a real JSON Schema built from the WSDL's XSD
