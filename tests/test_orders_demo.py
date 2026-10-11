@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import threading
 import time
 from pathlib import Path
@@ -94,3 +95,26 @@ async def test_bad_argument_type_rejected_before_soap(tmp_path):
     with pytest.raises(ValueError, match="schema validation"):
         await app._dispatch("orders_GetOrder", {"orderId": "abc"})
     app.close()
+
+
+@pytest.mark.asyncio
+async def test_soap_fault_surfaces_as_clean_error_not_a_stack_trace(tmp_path):
+    app = _build_app(tmp_path)
+    with pytest.raises(ValueError, match="Order 99999 not found"):
+        await app._dispatch("orders_GetOrder", {"orderId": 99999})
+    app.close()
+
+
+@pytest.mark.asyncio
+async def test_audit_log_records_both_success_and_error(tmp_path):
+    app = _build_app(tmp_path)
+    await app._dispatch("orders_GetOrder", {"orderId": 1001})
+    with pytest.raises(ValueError):
+        await app._dispatch("orders_GetOrder", {"orderId": 99999})
+    app.close()
+
+    entries = [json.loads(line) for line in (tmp_path / "audit.log").read_text().splitlines()]
+    by_event = {e["event"]: e for e in entries}
+
+    assert by_event["tool_call_success"]["tool"] == "orders_GetOrder"
+    assert "99999" in by_event["tool_call_error"]["error"]

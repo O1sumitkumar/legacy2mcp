@@ -82,9 +82,9 @@ legacy2mcp init
 
 | Demo | Setup | What you get |
 |---|---|---|
-| **REST: public Swagger Petstore** | none â [`examples/rest/config.petstore.yaml`](examples/rest/config.petstore.yaml) | 4 read tools; `delete_pet` hidden as a write |
-| **SOAP: sample Orders WSDL** | `python examples/soap/mock_orders_service.py` â [`config.orders.yaml`](examples/soap/config.orders.yaml) | `GetOrder`, `ListOrders`, `GetInventory`; `CreateOrder` / `CancelOrder` hidden as writes |
-| **SOAP: WSDL by URL** | none â [`config.orders.public-wsdl.yaml`](examples/soap/config.orders.public-wsdl.yaml) points at the sample WSDL in this repo | tool discovery with `inspect` (no calls) |
+| **REST: public Swagger Petstore** | none → [`examples/rest/config.petstore.yaml`](examples/rest/config.petstore.yaml) | 4 read tools; `delete_pet` hidden as a write |
+| **SOAP: sample Orders WSDL** | `python examples/soap/mock_orders_service.py` → [`config.orders.yaml`](examples/soap/config.orders.yaml) | `GetOrder`, `ListOrders`, `GetInventory`; `CreateOrder` / `CancelOrder` hidden as writes |
+| **SOAP: WSDL by URL** | none → [`config.orders.public-wsdl.yaml`](examples/soap/config.orders.public-wsdl.yaml) points at the sample WSDL in this repo | tool discovery with `inspect` (no calls) |
 
 Hook any of them up to Claude Desktop, Claude Code or Cursor with the snippets in
 [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
