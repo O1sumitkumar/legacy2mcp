@@ -13,9 +13,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
-<p><b>Point it at a WSDL or a database. Get an MCP server whose tools can't drift from the underlying schema, can't send unvalidated arguments, and can't call write operations (or run arbitrary SQL) you didn't opt into.</b></p>
+<p><b>Point it at a WSDL, a database, or a REST API. Get an MCP server whose tools can't drift from the underlying schema, can't send unvalidated arguments, and can't call write operations (or run arbitrary SQL) you didn't opt into.</b></p>
 
-<img src="demo/legacy2mcp.gif" alt="legacy2mcp turning a Calculator WSDL into four typed, schema-validated MCP tools" width="820">
+<img src="demo/legacy2mcp.gif" alt="legacy2mcp pointed at the public Swagger Petstore REST API, generating typed, schema-validated MCP tools with writes hidden by default" width="820">
 
 </div>
 

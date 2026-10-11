@@ -1,7 +1,8 @@
 # legacy2mcp demo recording - driven by VHS (https://github.com/charmbracelet/vhs)
 #
 #   brew install vhs
-#   vhs demo/demo.tape        # run from the repo root
+#   vhs demo/demo.tape        # run from the repo root -- needs network access
+#                             # to the public Swagger Petstore demo API
 #
 # Produces demo/legacy2mcp.gif and demo/legacy2mcp.mp4.
 # Keep every Type line ASCII-only: VHS mistypes non-ASCII characters.
@@ -18,53 +19,51 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 30ms
 Set Margin 0
 
-# --- setup (hidden): prompt, PATH, start the bundled mock SOAP service ---
+# --- setup (hidden): prompt, PATH, clean slate ---
 Hide
 Type "export PS1='$ '"
 Enter
 Type "[ -d .venv ] && export PATH=$PWD/.venv/bin:$PATH"
 Enter
-Type "python examples/soap/run_mock_calculator.py >/dev/null 2>&1 &"
+Type "rm -f config.yaml && clear"
 Enter
-Type "sleep 3 && clear"
-Enter
-Sleep 3s
+Sleep 1s
 Show
 
-Type "# legacy2mcp: turn a legacy SOAP/WSDL service into safe, typed MCP tools"
+Type "# legacy2mcp: turn a WSDL, database, or REST API into safe, typed MCP tools"
 Sleep 800ms
 Enter
 Sleep 1s
 
-Type "# 1. The whole config - just a WSDL URL. No adapter code."
+Type "# 1. Point it at a live REST API -- it finds the OpenAPI spec itself"
 Enter
 Sleep 400ms
-Type "cat examples/soap/config.calculator.yaml"
+Type "legacy2mcp init --rest-url https://petstore3.swagger.io/api/v3 --out config.yaml"
+Enter
+Sleep 4s
+
+Type "# 2. Introspect -> one typed MCP tool per endpoint, read-only by default"
+Enter
+Sleep 400ms
+Type "legacy2mcp inspect --config config.yaml | jq 'map(.name)'"
 Enter
 Sleep 3s
 
-Type "# 2. Introspect the WSDL -> one typed MCP tool per operation"
+Type "# 3. Each tool carries a real JSON Schema, built from the live spec"
 Enter
 Sleep 400ms
-Type "legacy2mcp inspect --config examples/soap/config.calculator.yaml | jq 'map(.name)'"
-Enter
-Sleep 3s
-
-Type "# 3. Each tool carries a real JSON Schema, built from the WSDL's XSD types"
-Enter
-Sleep 400ms
-Type "legacy2mcp inspect --config examples/soap/config.calculator.yaml | jq '.[0]'"
+Type "legacy2mcp inspect --config config.yaml | jq '.[2]'"
 Enter
 Sleep 3500ms
 
-Type "# Every call is schema-validated before it hits SOAP."
+Type "# deletePet is in the spec too, but stays hidden: it's a write."
 Enter
-Type "# Writes are off by default. Every call is audit-logged."
+Type "# Every call is schema-validated. Every call is audit-logged."
 Enter
 Sleep 2500ms
 
 Hide
-Type "kill %1 2>/dev/null; true"
+Type "rm -f config.yaml"
 Enter
 Show
 Sleep 500ms
