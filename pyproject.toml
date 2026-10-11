@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "legacy2mcp"
-version = "0.1.0"
-description = "Turn legacy SOAP/WSDL systems and databases into safe, typed, audit-logged MCP servers for AI agents."
+version = "0.2.0"
+description = "Turn legacy SOAP/WSDL services, databases, and REST APIs into safe, typed, audit-logged MCP servers for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
