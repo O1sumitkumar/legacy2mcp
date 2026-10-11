@@ -15,6 +15,8 @@
 
 <p><b>From a legacy SOAP/WSDL service, database, or REST API to a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
+<img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
+
 </div>
 
 ---
@@ -57,11 +59,8 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-No API key, no cloning — three commands against a public demo API:
-
-<img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
-
-Next, connect it to your AI client — see
+No API key, no cloning — the three commands above run against a public demo
+API. Next, connect it to your AI client — see
 [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
