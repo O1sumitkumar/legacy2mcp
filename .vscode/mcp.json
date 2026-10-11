@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "legacy2mcp-petstore-demo": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "examples/rest/config.petstore.yaml"]
+    }
+  }
+}

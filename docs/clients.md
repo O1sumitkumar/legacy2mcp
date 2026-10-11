@@ -11,7 +11,14 @@ uvx legacy2mcp run --config /absolute/path/to/config.yaml
 installed it with `pip` or `pipx`, replace `uvx legacy2mcp` with `legacy2mcp`.
 
 Use an **absolute** path for `--config`. Clients launch the server from their own working
-directory, so relative paths usually fail.
+directory, so relative paths usually fail -- the exception is a project-scoped config
+(`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`) committed into the same repo you're
+pointing it at, where the client's working directory is that repo's root. This repo ships
+exactly that at [`.mcp.json`](../.mcp.json), [`.cursor/mcp.json`](../.cursor/mcp.json), and
+[`.vscode/mcp.json`](../.vscode/mcp.json) -- all pointed at the bundled Petstore REST demo
+(`examples/rest/config.petstore.yaml`), so opening this repo in Claude Code, Cursor, or VS
+Code gets you a working `legacy2mcp` server with nothing to configure. Copy one into your
+own project and point `--config` at your own `config.yaml` (absolute path, in that case).
 
 ## Try it first: zero-setup demos
 

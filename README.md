@@ -298,6 +298,14 @@ does and doesn't guarantee before pointing it at anything real.
 Each client launches `uvx legacy2mcp run --config <absolute path>` over stdio. If you installed
 with `pip` or `pipx`, use `legacy2mcp` in place of `uvx legacy2mcp`.
 
+This repo itself ships working, checked-in configs for the project-scoped
+clients -- [`.mcp.json`](.mcp.json) (Claude Code and compatible clients),
+[`.cursor/mcp.json`](.cursor/mcp.json), and [`.vscode/mcp.json`](.vscode/mcp.json)
+-- all pointed at the bundled Petstore REST demo, so opening this repo in one
+of those tools gets you a working `legacy2mcp` server with no setup. Copy
+whichever matches your tool into your own project and point `--config` at
+your own `config.yaml`.
+
 **Claude Desktop** (`claude_desktop_config.json`)
 
 ```json

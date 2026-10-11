@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "legacy2mcp-petstore-demo": {
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "examples/rest/config.petstore.yaml"]
+    }
+  }
+}
