@@ -35,3 +35,10 @@ jobs:
           python examples/soap/run_mock_calculator.py &
           sleep 3
           legacy2mcp inspect --config examples/soap/config.calculator.yaml
+
+      - name: Verify the Orders and Petstore demo configs still generate tools
+        run: |
+          python examples/soap/mock_orders_service.py &
+          sleep 3
+          legacy2mcp inspect --config examples/soap/config.orders.yaml
+          legacy2mcp inspect --config examples/rest/config.petstore.yaml

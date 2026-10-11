@@ -1,0 +1,27 @@
+# Demo: the sample "Orders" SOAP service (examples/soap/orders.wsdl).
+#
+#   python examples/soap/mock_orders_service.py &      # terminal 1
+#   legacy2mcp inspect --config examples/soap/config.orders.yaml
+#
+# Read operations (GetOrder, ListOrders, GetInventory) become MCP tools.
+# CreateOrder and CancelOrder are write-like, so they stay hidden until you
+# set `allow_write_operations: true`.
+
+server:
+  name: legacy2mcp-orders-demo
+  transport: stdio
+
+adapters:
+  - id: orders
+    type: soap
+    enabled: true
+    config:
+      wsdl_url: "http://127.0.0.1:8124/orders?wsdl"
+      auth:
+        type: none
+      allow_write_operations: false
+
+security:
+  audit:
+    enabled: true
+    path: "./legacy2mcp-audit.log"

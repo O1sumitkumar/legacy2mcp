@@ -1,0 +1,28 @@
+# Zero-setup WSDL demo: point legacy2mcp at the sample WSDL hosted in this repo.
+# No clone and no local server. `inspect` only needs the WSDL itself.
+#
+#   curl -O https://raw.githubusercontent.com/bvenkata/legacy2mcp/main/examples/soap/config.orders.public-wsdl.yaml
+#   legacy2mcp inspect --config config.orders.public-wsdl.yaml
+#
+# This lists the generated tools but cannot call them, because the WSDL's
+# endpoint is a local address. To call the tools, run the matching mock
+# service (examples/soap/mock_orders_service.py) and use config.orders.yaml.
+
+server:
+  name: legacy2mcp-orders-public-wsdl
+  transport: stdio
+
+adapters:
+  - id: orders
+    type: soap
+    enabled: true
+    config:
+      wsdl_url: "https://raw.githubusercontent.com/bvenkata/legacy2mcp/main/examples/soap/orders.wsdl"
+      auth:
+        type: none
+      allow_write_operations: false
+
+security:
+  audit:
+    enabled: true
+    path: "./legacy2mcp-audit.log"

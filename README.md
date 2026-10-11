@@ -78,6 +78,17 @@ help with ambiguous code):
 legacy2mcp init
 ```
 
+### Demo targets (nothing of your own required)
+
+| Demo | Setup | What you get |
+|---|---|---|
+| **REST: public Swagger Petstore** | none → [`examples/rest/config.petstore.yaml`](examples/rest/config.petstore.yaml) | 4 read tools; `delete_pet` hidden as a write |
+| **SOAP: sample Orders WSDL** | `python examples/soap/mock_orders_service.py` → [`config.orders.yaml`](examples/soap/config.orders.yaml) | `GetOrder`, `ListOrders`, `GetInventory`; `CreateOrder` / `CancelOrder` hidden as writes |
+| **SOAP: WSDL by URL** | none → [`config.orders.public-wsdl.yaml`](examples/soap/config.orders.public-wsdl.yaml) points at the sample WSDL in this repo | tool discovery with `inspect` (no calls) |
+
+Hook any of them up to Claude Desktop, Claude Code or Cursor with the snippets in
+[Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
+
 <details>
 <summary>Prefer a fully offline demo? Run the bundled mock SOAP service</summary>
 
@@ -298,16 +309,42 @@ does and doesn't guarantee before pointing it at anything real.
 
 ## Use it from Claude Desktop (or any MCP client)
 
+Each client launches `uvx legacy2mcp run --config <absolute path>` over stdio. If you installed
+with `pip` or `pipx`, use `legacy2mcp` in place of `uvx legacy2mcp`.
+
+**Claude Desktop** (`claude_desktop_config.json`)
+
 ```json
 {
   "mcpServers": {
-    "legacy": {
-      "command": "legacy2mcp",
-      "args": ["run", "--config", "/absolute/path/to/config.yaml"]
+    "legacy2mcp": {
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "/absolute/path/to/config.yaml"]
     }
   }
 }
 ```
+
+**Claude Code**
+
+```bash
+claude mcp add legacy2mcp -- uvx legacy2mcp run --config /absolute/path/to/config.yaml
+```
+
+**Cursor** (`.cursor/mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "legacy2mcp": {
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "/absolute/path/to/config.yaml"]
+    }
+  }
+}
+```
+
+VS Code, passing secrets, and troubleshooting: [docs/clients.md](docs/clients.md).
 
 ## What's handled
 

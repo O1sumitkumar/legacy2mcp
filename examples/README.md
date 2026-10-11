@@ -8,6 +8,9 @@
 | [`soap/config.calculator.docker.yaml`](soap/config.calculator.docker.yaml) | Same, but wired for `docker compose` service names |
 | [`soap/config.template.yaml`](soap/config.template.yaml) | **Production-shaped template**: a legacy SOAP service with basic auth, an explicit operation allowlist, and audit logging |
 | [`soap/run_mock_calculator.py`](soap/run_mock_calculator.py) | Starts the in-process demo SOAP service on `http://127.0.0.1:8123/calculator` |
+| [`soap/orders.wsdl`](soap/orders.wsdl) + [`soap/mock_orders_service.py`](soap/mock_orders_service.py) | Sample "Orders" service with read (`GetOrder`, `ListOrders`, `GetInventory`) and write (`CreateOrder`, `CancelOrder`) operations, for seeing the write-gate in action |
+| [`soap/config.orders.yaml`](soap/config.orders.yaml) | Points at the local mock Orders service above |
+| [`soap/config.orders.public-wsdl.yaml`](soap/config.orders.public-wsdl.yaml) | Points at `orders.wsdl` by its raw GitHub URL -- `inspect` with no cloning (can't call tools, since the WSDL's bound address is local) |
 
 ### Try the demo end to end (no external network)
 
@@ -35,6 +38,7 @@ legacy2mcp inspect --config examples/soap/config.calculator.yaml
 | File | What it shows |
 |------|---------------|
 | [`rest/config.template.yaml`](rest/config.template.yaml) | **Production-shaped template**: a REST API with bearer auth, an explicit endpoint allowlist, and audit logging |
+| [`rest/config.petstore.yaml`](rest/config.petstore.yaml) | Zero-setup demo against the public Swagger Petstore -- no API key, nothing to run locally |
 
 There's no live schema to introspect a plain REST API from the way there is
 a WSDL or a DB catalog, so either write `rest/config.template.yaml` by hand,
