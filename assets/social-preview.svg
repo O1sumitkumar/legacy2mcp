@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="legacy2mcp social preview">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="legacy2mcp social preview — legacy SOAP/WSDL, database, or REST API turned into safe, typed MCP tools">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0a0f1c"/>
@@ -21,13 +21,23 @@
 
   <g font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" text-anchor="middle">
     <text x="640" y="238" fill="#eef1f8" font-size="96" font-weight="800" letter-spacing="-2">legacy<tspan fill="#a371f7">2</tspan>mcp</text>
-    <text x="640" y="300" fill="#aab4cd" font-size="33" font-weight="500">Legacy SOAP/WSDL &#8594; safe, typed MCP tools</text>
+    <text x="640" y="300" fill="#aab4cd" font-size="33" font-weight="500">WSDL, database, or REST API &#8594; safe, typed MCP tools</text>
 
     <g transform="translate(455,360)">
-      <rect x="0" y="0" width="128" height="128" rx="20" fill="none" stroke="#4b5675" stroke-width="4"/>
-      <text x="64" y="76" text-anchor="middle" fill="#8b93a7" font-size="26" font-weight="700" letter-spacing="1">SOAP</text>
-      <path d="M162 64 H262" stroke="url(#accent)" stroke-width="7" stroke-linecap="round"/>
-      <path d="M244 46 L270 64 L244 82" fill="none" stroke="url(#accent)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="0" y="-12" width="104" height="44" rx="11" fill="none" stroke="#4b5675" stroke-width="3.5"/>
+      <text x="52" y="16" text-anchor="middle" fill="#8b93a7" font-size="16" font-weight="700" letter-spacing="1">SOAP</text>
+
+      <rect x="0" y="42" width="104" height="44" rx="11" fill="none" stroke="#4b5675" stroke-width="3.5"/>
+      <text x="52" y="70" text-anchor="middle" fill="#8b93a7" font-size="16" font-weight="700" letter-spacing="1">DB</text>
+
+      <rect x="0" y="96" width="104" height="44" rx="11" fill="none" stroke="#4b5675" stroke-width="3.5"/>
+      <text x="52" y="124" text-anchor="middle" fill="#8b93a7" font-size="16" font-weight="700" letter-spacing="1">REST</text>
+
+      <path d="M104 10 Q180 10 240 64" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+      <path d="M104 64 H240" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+      <path d="M104 118 Q180 118 240 64" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+      <path d="M240 46 L266 64 L240 82" fill="none" stroke="url(#accent)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
       <g filter="url(#glow)">
         <path d="M356 0 l56 33 v62 l-56 33 -56 -33 v-62 z" fill="none" stroke="url(#accent)" stroke-width="6"/>
       </g>
