@@ -15,8 +15,6 @@
 
 <p><b>From a legacy SOAP/WSDL service, database, or REST API to a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
-<img src="demo/legacy2mcp.gif" alt="legacy2mcp pointed at the public Swagger Petstore REST API, generating typed, schema-validated MCP tools with writes hidden by default" width="820">
-
 </div>
 
 ---
@@ -59,32 +57,17 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-Two zero-setup demos. Pick one:
+No API key, no cloning — three commands against a public demo API:
 
-**REST** — no cloning, no local server, just a public API:
+<img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
 
-```bash
-pip install legacy2mcp
-legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
-legacy2mcp inspect --config config.yaml   # see the generated MCP tools
-```
-
-**SOAP** — runs a sample service locally, so you can also see writes get hidden:
-
-```bash
-git clone https://github.com/bvenkata/legacy2mcp.git && cd legacy2mcp
-pip install -e ".[dev]"
-python examples/soap/mock_orders_service.py &
-legacy2mcp inspect --config examples/soap/config.orders.yaml
-```
-
-Both print the generated MCP tools. Next, connect one to your AI client — see
+Next, connect it to your AI client — see
 [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
 flags) walks you through it — see
-[Generate a config automatically](#generate-a-config-automatically). A few
-more demo variants (Docker, a WSDL served by raw URL) are listed in
+[Generate a config automatically](#generate-a-config-automatically). More
+demos (a local SOAP service, Docker, a WSDL served by raw URL) are listed in
 [examples/](examples/README.md).
 
 ## How it works

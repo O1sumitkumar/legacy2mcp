@@ -1,5 +1,8 @@
 # Examples
 
+Prefer to watch it instead of reading? [`../demo/legacy2mcp.gif`](../demo/legacy2mcp.gif)
+is a terminal recording of `legacy2mcp init` against the REST demo below.
+
 ## SOAP / WSDL
 
 | File | What it shows |
