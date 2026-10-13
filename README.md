@@ -15,6 +15,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
+<p>
+  <a href="#client-claude-desktop"><img src="https://img.shields.io/badge/Verified-Claude%20Desktop-7C3AED" alt="Verified: Claude Desktop"></a>
+  <a href="#client-cursor"><img src="https://img.shields.io/badge/Verified-Cursor-000000" alt="Verified: Cursor"></a>
+  <a href="#client-vs-code"><img src="https://img.shields.io/badge/Verified-VS%20Code-007ACC" alt="Verified: VS Code"></a>
+  <a href="#client-claude-code"><img src="https://img.shields.io/badge/Claude%20Code-D97706" alt="Claude Code"></a>
+  <a href="#client-mcp-inspector"><img src="https://img.shields.io/badge/Tested%20with-MCP%20Inspector-22C55E" alt="Tested with MCP Inspector"></a>
+</p>
+
 <p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, or REST API into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
 <img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
@@ -36,7 +44,7 @@
 - [Point it at your own database](#point-it-at-your-own-database)
 - [Point it at your own REST API](#point-it-at-your-own-rest-api)
 - [Generate a config automatically](#generate-a-config-automatically)
-- [Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client)
+- [Client support](#client-support)
 - [What's handled](#whats-handled)
 - [Safety model](#safety-model)
 - [Use cases](#use-cases)
@@ -70,8 +78,7 @@ legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.ya
 legacy2mcp inspect --config config.yaml   # see the generated MCP tools
 ```
 
-Next, connect it to your AI client — see
-[Use it from Claude Desktop](#use-it-from-claude-desktop-or-any-mcp-client).
+Next, connect it to your AI client — see [Client support](#client-support).
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
 flags) walks you through it — see
@@ -293,20 +300,49 @@ legacy2mcp run     --config config.yaml   # start the MCP server
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
 
-## Use it from Claude Desktop (or any MCP client)
+## Client support
 
-Each client launches `uvx legacy2mcp run --config <absolute path>` over stdio. If you installed
-with `pip` or `pipx`, use `legacy2mcp` in place of `uvx legacy2mcp`.
+[![Verified: Claude Desktop](https://img.shields.io/badge/Verified-Claude%20Desktop-7C3AED)](#client-claude-desktop)
+[![Verified: Cursor](https://img.shields.io/badge/Verified-Cursor-000000)](#client-cursor)
+[![Verified: VS Code](https://img.shields.io/badge/Verified-VS%20Code-007ACC)](#client-vs-code)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-D97706)](#client-claude-code)
+[![Tested with MCP Inspector](https://img.shields.io/badge/Tested%20with-MCP%20Inspector-22C55E)](#client-mcp-inspector)
+[![MCP compatibility](https://github.com/bvenkata/legacy2mcp/actions/workflows/mcp-compatibility.yml/badge.svg)](https://github.com/bvenkata/legacy2mcp/actions/workflows/mcp-compatibility.yml)
 
-This repo itself ships working, checked-in configs for the project-scoped
-clients -- [`.mcp.json`](.mcp.json) (Claude Code and compatible clients),
-[`.cursor/mcp.json`](.cursor/mcp.json), and [`.vscode/mcp.json`](.vscode/mcp.json)
--- all pointed at the bundled Petstore REST demo, so opening this repo in one
-of those tools gets you a working `legacy2mcp` server with no setup. Copy
-whichever matches your tool into your own project and point `--config` at
-your own `config.yaml`.
+"Verified" here means a specific, narrow thing: the exact command + config
+shape shown below was actually spawned and completed a real MCP
+`initialize` handshake over stdio -- not just "MCP should be compatible."
+For MCP Inspector, the loop was driven further: a real `tools/list`, a real
+`tools/call`, and the resulting [audit log](#safety-model) entry, all
+headlessly via the Inspector's own `--cli` mode. The last badge is what
+keeps that claim honest over time rather than a one-time snapshot: a CI job
+([`mcp-compatibility.yml`](.github/workflows/mcp-compatibility.yml)) re-runs
+that same `tools/list` / `tools/call` / audit-log loop on every push and
+fails the build if the server can't start or exposes the wrong tools. Every
+client below talks to `legacy2mcp` over **stdio only** -- there's no
+HTTP/SSE transport yet (it's on the [roadmap](docs/roadmap.md), not
+shipped), so an `http://localhost:...` MCP URL won't work here.
 
-**Claude Desktop** (`claude_desktop_config.json`)
+| Client | Status | How it was verified |
+|---|---|---|
+| Claude Desktop | Verified | Spawned the exact `claude_desktop_config.json` command, completed a real `initialize` handshake, confirmed tools listed |
+| Cursor | Verified | Same, via `.cursor/mcp.json`'s exact command |
+| VS Code | Verified | Same, via `.vscode/mcp.json`'s exact command |
+| Claude Code | Documented | Uses the identical launch command verified above via `claude mcp add`; that command itself wasn't independently re-run in this environment |
+| MCP Inspector | Tested | Full CLI loop -- `tools/list`, `tools/call`, and the audit log entry it produced |
+
+This repo also ships the checked-in configs themselves --
+[`.mcp.json`](.mcp.json), [`.cursor/mcp.json`](.cursor/mcp.json), and
+[`.vscode/mcp.json`](.vscode/mcp.json) -- pointed at the bundled Petstore
+demo, so opening this repo in one of these tools gets you a working server
+with no setup. Copy whichever matches your tool into your own project and
+point `--config` at your own `config.yaml`.
+
+<details id="client-claude-desktop">
+<summary><b>Claude Desktop</b> — <code>claude_desktop_config.json</code></summary>
+
+macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -319,26 +355,74 @@ your own `config.yaml`.
 }
 ```
 
-**Claude Code**
+If you installed with `pip`/`pipx` instead of `uv`, use `"command": "legacy2mcp"` and drop the
+first element of `args`.
+
+</details>
+
+<details id="client-cursor">
+<summary><b>Cursor</b> — <code>.cursor/mcp.json</code></summary>
+
+Project-local (`.cursor/mcp.json`) or global (`~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "legacy2mcp": {
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "/absolute/path/to/config.yaml"]
+    }
+  }
+}
+```
+
+</details>
+
+<details id="client-vs-code">
+<summary><b>VS Code</b> — <code>.vscode/mcp.json</code></summary>
+
+```json
+{
+  "servers": {
+    "legacy2mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["legacy2mcp", "run", "--config", "/absolute/path/to/config.yaml"]
+    }
+  }
+}
+```
+
+</details>
+
+<details id="client-claude-code">
+<summary><b>Claude Code</b> — CLI</summary>
 
 ```bash
 claude mcp add legacy2mcp -- uvx legacy2mcp run --config /absolute/path/to/config.yaml
 ```
 
-**Cursor** (`.cursor/mcp.json`)
+Add `--scope project` to write a shared `.mcp.json` for your team (keep secrets out of it);
+check with `claude mcp list`.
 
-```json
-{
-  "mcpServers": {
-    "legacy2mcp": {
-      "command": "uvx",
-      "args": ["legacy2mcp", "run", "--config", "/absolute/path/to/config.yaml"]
-    }
-  }
-}
+</details>
+
+<details id="client-mcp-inspector">
+<summary><b>MCP Inspector</b> — a validation tool, not an AI client</summary>
+
+```bash
+npx @modelcontextprotocol/inspector uvx legacy2mcp run --config /absolute/path/to/config.yaml
 ```
 
-VS Code, passing secrets, and troubleshooting: [docs/clients.md](docs/clients.md).
+Opens a local web UI: connect to the server, confirm tools are listed, run one read-only tool,
+and check `legacy2mcp-audit.log` for the matching entry. That exact loop -- tool discovery, one
+real call, the audit log it produces -- is what the "Tested with MCP Inspector" badge above
+is actually backed by, driven headlessly through the Inspector's own `--cli` mode rather than
+just opened in a browser.
+
+</details>
+
+Passing secrets and troubleshooting: [docs/clients.md](docs/clients.md).
 
 ## What's handled
 

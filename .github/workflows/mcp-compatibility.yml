@@ -1,0 +1,81 @@
+name: MCP compatibility
+
+# Backs the "Verified" / "Tested with MCP Inspector" badges in README.md with
+# something that actually re-runs on every push, instead of a one-time claim:
+# installs the package, spawns the exact server process every client config
+# launches, and drives a real tools/list + tools/call through MCP Inspector's
+# own --cli mode (the same way this was first verified by hand). Fails the
+# build if the server can't start, exposes the wrong tools, or legacy2mcp's
+# own request/response/audit-log path misbehaves.
+#
+# Uses the bundled Petstore REST demo, so this does make one real network
+# call to https://petstore3.swagger.io -- a stable public demo API, the same
+# one the README's quick start and client configs already depend on. That
+# demo has been observed returning a transient 500 on one of its endpoints
+# (/store/inventory) during development of this workflow -- a problem with
+# that public service, not with legacy2mcp. So the tools/call step only
+# requires a well-formed MCP response (legacy2mcp didn't crash) and the audit
+# log step accepts either a success or an error entry: the thing actually
+# under test is legacy2mcp's own machinery, not Swagger's demo uptime.
+#
+# The launch command is wrapped in a shell script rather than passed to the
+# Inspector CLI directly: the Inspector's own --config flag collides by name
+# with legacy2mcp's --config, and gets intercepted regardless of argument
+# order or a `--` separator.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  inspector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install legacy2mcp
+        run: pip install -e .
+
+      - name: Wrapper script (avoids an Inspector CLI --config name collision)
+        run: |
+          printf '#!/bin/bash\nexec legacy2mcp run --config examples/rest/config.petstore.yaml\n' > run_demo.sh
+          chmod +x run_demo.sh
+          cat run_demo.sh
+
+      - name: tools/list -- server starts and exposes the expected tools
+        run: |
+          npx -y @modelcontextprotocol/inspector@latest --cli \
+            bash run_demo.sh --method tools/list > tools.json
+          cat tools.json
+          count=$(jq '.tools | length' tools.json)
+          echo "tool count: $count"
+          test "$count" -ge 1
+          jq -e '.tools[] | select(.name == "petstore_find_pets_by_status")' tools.json > /dev/null
+          if jq -e '.tools[] | select(.name == "petstore_delete_pet")' tools.json > /dev/null; then
+            echo "FAIL: petstore_delete_pet is a write operation and should stay hidden by default"
+            exit 1
+          fi
+
+      - name: tools/call -- a real call gets a well-formed MCP response
+        run: |
+          npx -y @modelcontextprotocol/inspector@latest --cli \
+            bash run_demo.sh --method tools/call --tool-name petstore_find_pets_by_status \
+            --tool-arg status=available > call.json
+          cat call.json
+          jq -e '.content' call.json > /dev/null
+
+      - name: Audit log recorded the call's outcome
+        run: |
+          test -f legacy2mcp-audit.log
+          cat legacy2mcp-audit.log
+          python3 -c "import json,sys; lines=[json.loads(l) for l in open('legacy2mcp-audit.log')]; sys.exit(0 if any(l['event'] in ('tool_call_success','tool_call_error') and l['tool']=='petstore_find_pets_by_status' for l in lines) else 1)"

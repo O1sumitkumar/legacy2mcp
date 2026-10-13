@@ -110,6 +110,22 @@ Create `.vscode/mcp.json`:
 }
 ```
 
+## MCP Inspector
+
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector) is a validation tool, not an
+AI client -- useful for confirming a config actually works before wiring it into one:
+
+```bash
+npx @modelcontextprotocol/inspector uvx legacy2mcp run --config /absolute/path/to/config.yaml
+```
+
+Opens a local web UI. Connect to the server, confirm the tools you expect are listed, run one
+read-only tool, and check the matching entry in `legacy2mcp-audit.log`. The same loop -- tool
+discovery, a real call, the audit log it produces -- also runs headlessly through the
+Inspector's own `--cli` mode, e.g. `... --cli uvx legacy2mcp run --config ... --method
+tools/list` (note: pass `--method` and any `--tool-name`/`--tool-arg` *after* the target
+command, not before, or the Inspector's own argument parser swallows them).
+
 ## Secrets
 
 Config files reference environment variable **names** (`password_env`, `token_env`, `dsn_env`),
