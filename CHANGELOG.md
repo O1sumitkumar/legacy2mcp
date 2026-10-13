@@ -1,0 +1,71 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+- Demo GIF and banner/social-preview assets regenerated to show the REST
+  adapter and `legacy2mcp init`, not just the original SOAP-only flow.
+- Checked-in MCP client configs (`.mcp.json`, `.cursor/mcp.json`,
+  `.vscode/mcp.json`), pointed at the bundled Petstore REST demo.
+- `llms.txt` at the repo root.
+- `.github/dependabot.yml` (pip + github-actions) and a committed `uv.lock`
+  for the full dependency graph.
+- A client-support badge row backed by `.github/workflows/mcp-compatibility.yml`,
+  which re-runs a real `tools/list` / `tools/call` / audit-log check through
+  MCP Inspector's `--cli` mode on every push.
+- README: Quick start simplified to one copyable 3-command block, a "Why not
+  just write an adapter by hand?" comparison section, and various accuracy
+  fixes (numbering, stale labels, literal project name in the H1 and opening
+  sentence for discoverability).
+
+## [0.2.1] - 2026-10-10
+
+- Fixed: `server.json`'s description exceeded the MCP Registry's 100-character
+  limit, so the registry publish step of the 0.2.0 release failed (PyPI
+  publish had already succeeded). No code changes -- metadata-only patch so
+  both channels ended up in sync.
+
+## [0.2.0] - 2026-10-10
+
+### Added
+
+- **Database adapter** (`type: db`): introspects a live Postgres / SQL Server
+  / Oracle schema and exposes `select_<table>` / `insert_<table>` tools for
+  an explicit table/operation allowlist, plus named parameterized queries.
+  No arbitrary SQL from the LLM, ever.
+- **REST adapter** (`type: rest`): endpoint allowlist (method, path, typed
+  params) from config, with bearer/basic/none auth. Needed because there's
+  no live schema to introspect a plain REST API from the way there is for
+  SOAP/DB.
+- **`legacy2mcp init`**: generates a starting `config.yaml` from a WSDL URL
+  (points a `soap` adapter at it directly), a REST API URL (tries
+  OpenAPI/Swagger discovery), or a GitHub repo / local path (static AST scan
+  for a SOAP client, an ORM model, or Flask/FastAPI routes). Optional
+  OpenAI-compatible LLM assist refines only the ambiguous bits the scan
+  flagged -- never a dump of the source -- and is skippable entirely with
+  `--scan-only`.
+
+## [0.1.0] - 2026-09-06
+
+### Added
+
+- Initial release: SOAP/WSDL adapter. Introspects any WSDL via `zeep`,
+  generates one typed MCP tool per operation with a JSON Schema built from
+  the WSDL's own XSD types, validates every call against that schema before
+  it reaches the SOAP endpoint.
+- Write-like operations (name-heuristic: `Create*`, `Update*`, `Delete*`, ...)
+  excluded by default, opt-in via `allow_write_operations: true`.
+  `include_operations` / `exclude_operations` allowlist/denylist on top.
+- Basic auth support for the WSDL endpoint.
+- Audit log: one JSON line per call (tool, arguments, timestamp, outcome).
+- CLI: `legacy2mcp run --config ...` and `legacy2mcp inspect --config ...`.
+- `stdio` transport.
+
+[Unreleased]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/bvenkata/legacy2mcp/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/bvenkata/legacy2mcp/releases/tag/v0.1.0
