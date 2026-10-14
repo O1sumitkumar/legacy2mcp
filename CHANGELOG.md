@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `legacy2mcp init`, run from a real terminal against a config that's
+  already usable, now opens a local "try it" chat page in your browser --
+  no AI/API key needed, since it's local keyword matching against the
+  discovered tools' names/descriptions (not an LLM) that calls the real
+  adapter and shows the real response. Skipped for configs that still have
+  TODOs to fill in, and never triggered in non-interactive/scripted runs.
+  `--no-chat` opts out.
+
 ## [0.2.3] - 2026-10-13
 
 ### Added

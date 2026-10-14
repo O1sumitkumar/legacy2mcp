@@ -322,6 +322,17 @@ and are gated behind `allow_write_operations`, and the review items above).
 Pass `--html-out` to change where it's written, or `--no-html-report` to
 skip it.
 
+**Run `init` from a real terminal against a config that's already usable**
+(a live `--wsdl-url`/`--rest-url`, or a scan that found something concrete)
+**and it also opens a local test-chat page** in your browser -- type a
+question like "get pet 4" and it matches it to a discovered tool, calls the
+real adapter, and shows you the real response. No AI/API key needed for
+this -- it's local keyword matching against the tool names/descriptions, not
+an LLM, just enough to sanity-check that the server actually works before
+you wire up a real MCP client. It's skipped automatically when the config
+still has TODOs to fill in (nothing to connect to yet), and never opens at
+all in non-interactive/scripted runs. Pass `--no-chat` to opt out.
+
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
 

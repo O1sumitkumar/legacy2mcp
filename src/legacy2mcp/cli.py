@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 
+from legacy2mcp import webui
 from legacy2mcp.config import load_config
 from legacy2mcp.discovery import classify, generate, openapi, repo, report, scan
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
@@ -199,6 +200,59 @@ def _cmd_init(args: argparse.Namespace) -> None:
         print(f"{len(todos)} TODO(s) left in the file -- review before running.", file=sys.stderr)
     print(f"Next: legacy2mcp inspect --config {out_path}", file=sys.stderr)
 
+    if interactive and not args.no_chat:
+        _maybe_launch_chat(config, out_path)
+
+
+def _config_is_runnable(config: dict) -> bool:
+    """Whether this config can actually be connected to as-is, with no
+    manual editing -- i.e. no REPLACE_ME_* placeholder, and (for the db
+    adapter) its DSN env var is already set. Used to decide whether it's
+    worth trying to open the test chat at all, rather than opening a
+    browser tab that can only fail."""
+    adapter = config["adapters"][0]
+    adapter_type = adapter["type"]
+    settings = adapter["config"]
+
+    if adapter_type == "rest":
+        return not str(settings.get("base_url", "")).startswith("REPLACE_ME")
+    if adapter_type == "soap":
+        return not str(settings.get("wsdl_url", "")).startswith("REPLACE_ME")
+    if adapter_type == "db":
+        dsn_env = settings.get("dsn_env")
+        return bool(dsn_env and os.environ.get(dsn_env))
+    return False
+
+
+def _maybe_launch_chat(config: dict, out_path) -> None:
+    """Open a local, no-API-key "try it" chat page (see webui.py) so you
+    can immediately ask it something and see a real response, without
+    needing to wire up an MCP client first. Never fatal -- config.yaml is
+    already written by the time this runs, so any failure here just prints
+    a note and falls back to pointing at `legacy2mcp run`."""
+    if not _config_is_runnable(config):
+        print(
+            "Skipping the test chat -- fill in the TODOs above first, "
+            f"then run `legacy2mcp run --config {out_path}`.",
+            file=sys.stderr,
+        )
+        return
+
+    try:
+        app = Legacy2McpApp(load_config(str(out_path)))
+    except Exception as exc:
+        print(f"Skipping the test chat -- couldn't connect ({exc}).", file=sys.stderr)
+        return
+
+    try:
+        server = webui.start_server(app)
+        url = f"http://{server.server_address[0]}:{server.server_address[1]}/"
+        print(f"Opening a test chat at {url} (no AI key needed -- Ctrl+C to stop).", file=sys.stderr)
+        webui.open_browser(url)
+        webui.serve_until_interrupted(server)
+    finally:
+        app.close()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="legacy2mcp")
@@ -253,6 +307,14 @@ def main() -> None:
     )
     init_parser.add_argument(
         "--no-html-report", action="store_true", help="Skip generating the HTML report."
+    )
+    init_parser.add_argument(
+        "--no-chat",
+        action="store_true",
+        help=(
+            "Don't open the local test-chat page after writing the config. (It only opens "
+            "when run interactively and the config needs no further edits to connect.)"
+        ),
     )
     init_parser.set_defaults(func=_cmd_init)
 
