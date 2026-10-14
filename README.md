@@ -33,7 +33,7 @@
 
 <p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, or REST API into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
-<img src="assets/quickstart.svg" alt="Quick start: pip install legacy2mcp, legacy2mcp init --rest-url against the public Swagger Petstore to write config.yaml, then paste this MCP config into Claude Desktop, Cursor, or VS Code so the client starts the server itself and its tools show up" width="820">
+<img src="assets/quickstart.svg" alt="Quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, which writes config.yaml and opens a local test-chat page -- click an example question and get a real response from the live API, no AI key needed" width="820">
 
 </div>
 
@@ -85,11 +85,17 @@ No API key, no cloning — against a public demo API:
 
 ```bash
 pip install legacy2mcp
-legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml
-legacy2mcp inspect --config config.yaml   # see the generated MCP tools
+legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
 ```
 
-Next, connect it to your AI client — see [Client support](#client-support).
+Run that from a real terminal and it opens a local test-chat page in your
+browser automatically — click one of the example questions and see a real
+response come back from the live API. No AI key needed for this part; it's
+local keyword matching against the tools it just discovered, just enough
+to sanity-check that the generated server actually works. (Prefer the raw
+tool list instead? `legacy2mcp inspect --config config.yaml`.)
+
+Next, connect it to your AI client for real — see [Client support](#client-support).
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
 flags) walks you through it — see
@@ -324,14 +330,17 @@ skip it.
 
 **Run `init` from a real terminal against a config that's already usable**
 (a live `--wsdl-url`/`--rest-url`, or a scan that found something concrete)
-**and it also opens a local test-chat page** in your browser -- type a
-question like "get pet 4" and it matches it to a discovered tool, calls the
-real adapter, and shows you the real response. No AI/API key needed for
-this -- it's local keyword matching against the tool names/descriptions, not
-an LLM, just enough to sanity-check that the server actually works before
-you wire up a real MCP client. It's skipped automatically when the config
-still has TODOs to fill in (nothing to connect to yet), and never opens at
-all in non-interactive/scripted runs. Pass `--no-chat` to opt out.
+**and it also opens a local test-chat page** in your browser, with a
+clickable example question under every discovered tool (generated from
+that tool's own name and schema, e.g. `getPetById` -> "get pet by id 4") so
+you don't have to guess what to type. Click one, or type your own, and it
+matches it to a discovered tool, calls the real adapter, and shows you the
+real response. No AI/API key needed for this -- it's local keyword
+matching against the tool names/descriptions, not an LLM, just enough to
+sanity-check that the server actually works before you wire up a real MCP
+client. It's skipped automatically when the config still has TODOs to fill
+in (nothing to connect to yet), and never opens at all in
+non-interactive/scripted runs. Pass `--no-chat` to opt out.
 
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
