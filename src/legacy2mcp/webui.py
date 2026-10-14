@@ -131,9 +131,55 @@ def extract_params(question: str, tool_def: ToolDefinition) -> tuple[dict[str, o
     return params, missing
 
 
+_EXAMPLE_VALUE_BY_TYPE = {"integer": "4", "number": "4", "boolean": "true"}
+# A handful of common string param names worth guessing a real value for --
+# anything else is left out of the example rather than faking a bad guess
+# (e.g. reusing the param name itself, which reads as "status status").
+_EXAMPLE_STRING_BY_PARAM_NAME = {
+    "status": "available",
+    "name": "example",
+    "email": "user@example.com",
+    "tag": "tag1",
+    "query": "example",
+    "q": "example",
+    "username": "example",
+}
+
+
+def example_question(tool_def: ToolDefinition) -> str:
+    """A plausible question that would actually match this tool, generated
+    from its own name/schema -- so the UI can suggest something real for
+    *any* discovered API, not just Petstore. E.g. 'legacy_getPetById' with
+    a required integer 'petId' -> "get pet by id 4". A required param this
+    can't confidently guess a value for is simply left out -- asking it
+    will still match the right tool and the reply explains what's missing."""
+    words = _CAMEL_WORD_RE.findall(_bare_name(tool_def.name).replace("_", " "))
+    phrase = " ".join(w.lower() for w in words)
+
+    schema = tool_def.input_schema or {}
+    properties: dict[str, dict] = schema.get("properties", {})
+    required: list[str] = schema.get("required", [])
+
+    values = []
+    for name in required:
+        json_type = properties.get(name, {}).get("type", "string")
+        if json_type in _EXAMPLE_VALUE_BY_TYPE:
+            values.append(_EXAMPLE_VALUE_BY_TYPE[json_type])
+        elif json_type == "string" and name.lower() in _EXAMPLE_STRING_BY_PARAM_NAME:
+            values.append(_EXAMPLE_STRING_BY_PARAM_NAME[name.lower()])
+    if values:
+        phrase += " " + " ".join(values)
+    return phrase
+
+
 def _tools_json(app: Legacy2McpApp) -> list[dict]:
     return [
-        {"name": td.name, "description": td.description, "input_schema": td.input_schema}
+        {
+            "name": td.name,
+            "description": td.description,
+            "input_schema": td.input_schema,
+            "example": example_question(td),
+        }
         for _, td in app._tools.values()
     ]
 
@@ -193,6 +239,10 @@ _PAGE = """<!doctype html>
   .tool { background: #0f1830; border: 1px solid #28325a; border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.6rem; }
   .tool code { color: #a371f7; font-size: 0.85rem; }
   .tool p { margin: 0.3rem 0 0; font-size: 0.78rem; color: #aab2c8; }
+  .tool .example { display: block; margin-top: 0.5rem; background: none; border: 1px dashed #3a4878; border-radius: 6px;
+                    color: #6fe39a; font-size: 0.76rem; font-family: ui-monospace, monospace; text-align: left;
+                    padding: 0.3rem 0.5rem; cursor: pointer; width: 100%; }
+  .tool .example:hover { border-color: #6fe39a; }
   main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #log { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
   .msg { max-width: 70%; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
@@ -219,7 +269,7 @@ _PAGE = """<!doctype html>
     <div id="tools"></div>
   </aside>
   <main>
-    <div id="log"><div class="empty">Ask something below, e.g. mentioning a tool name or its parameters.</div></div>
+    <div id="log"><div class="empty">Ask something below, or click a "Try:" example on the left.</div></div>
     <form id="form">
       <input id="q" autocomplete="off" placeholder="e.g. get pet 4" />
       <button type="submit">Ask</button>
@@ -230,9 +280,35 @@ _PAGE = """<!doctype html>
 async function loadTools() {
   const res = await fetch('/tools');
   const tools = await res.json();
-  document.getElementById('tools').innerHTML = tools.map(t =>
-    `<div class="tool"><code>${t.name}</code><p>${t.description || ''}</p></div>`
-  ).join('') || '<p class="empty">No tools discovered.</p>';
+  const container = document.getElementById('tools');
+  container.innerHTML = '';
+  if (!tools.length) {
+    container.innerHTML = '<p class="empty">No tools discovered.</p>';
+    return;
+  }
+  for (const t of tools) {
+    const card = document.createElement('div');
+    card.className = 'tool';
+
+    const name = document.createElement('code');
+    name.textContent = t.name;
+    card.appendChild(name);
+
+    const desc = document.createElement('p');
+    desc.textContent = t.description || '';
+    card.appendChild(desc);
+
+    if (t.example) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'example';
+      btn.textContent = 'Try: "' + t.example + '"';
+      btn.addEventListener('click', () => ask(t.example));
+      card.appendChild(btn);
+    }
+
+    container.appendChild(card);
+  }
 }
 
 function addMsg(role, text, toolName) {
@@ -252,13 +328,8 @@ function addMsg(role, text, toolName) {
   log.scrollTop = log.scrollHeight;
 }
 
-document.getElementById('form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const input = document.getElementById('q');
-  const question = input.value.trim();
-  if (!question) return;
+async function ask(question) {
   addMsg('user', question);
-  input.value = '';
   try {
     const res = await fetch('/ask', { method: 'POST', body: JSON.stringify({ question }) });
     const data = await res.json();
@@ -266,6 +337,15 @@ document.getElementById('form').addEventListener('submit', async (e) => {
   } catch (err) {
     addMsg('assistant', 'Request failed: ' + err);
   }
+}
+
+document.getElementById('form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('q');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  ask(question);
 });
 
 loadTools();

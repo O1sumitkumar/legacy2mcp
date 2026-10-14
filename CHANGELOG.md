@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The test chat page now shows a clickable "Try: ..." example question
+  under each discovered tool, generated from that tool's own name/schema
+  (e.g. `getPetById` with a required integer `petId` -> "get pet by id 4"),
+  so it's obvious what to type for any API, not just the ones in the docs.
+
 ## [0.2.4] - 2026-10-13
 
 ### Added
