@@ -640,6 +640,7 @@ Call the same generated, validated tools from your own code via any MCP client l
 | [docs/registry-submissions.md](docs/registry-submissions.md) | Registry / awesome-list submission status and reusable copy |
 | [examples/README.md](examples/README.md) | Every runnable demo config (SOAP, REST, Docker) |
 | [llms.txt](llms.txt) | A machine-readable project summary for LLMs and agents |
+| [skill/legacy2mcp/](skill/legacy2mcp/) | A [SKILL.md](https://www.agensi.io/learn/what-is-skill-md) for coding agents (Claude Code, Cursor, Copilot, ...) — teaches an agent when and how to drive `legacy2mcp` itself |
 | [CHANGELOG.md](CHANGELOG.md) | Notable changes, release by release |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, how to add an adapter, PR expectations |
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `skill/legacy2mcp/` -- a [SKILL.md](https://www.agensi.io/learn/what-is-skill-md)
+  for AI coding agents (Claude Code, Cursor, Copilot, etc.): teaches an
+  agent when and how to use `legacy2mcp` itself -- picking the right
+  `init` flag per source type, reviewing the generated config before
+  trusting it, and carrying the read-only/audit-logged safety posture into
+  its recommendations. `references/sources.md` has the per-source-type
+  detail (SOAP/WSDL, REST, GitHub-repo scan, database).
+
 ### Changed
 
 - Upgraded `mcp` 1.29.1 -> 2.3.0. The SDK dropped the `@server.list_tools()`/
