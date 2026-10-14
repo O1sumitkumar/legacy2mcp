@@ -7,9 +7,10 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 from legacy2mcp.config import load_config
-from legacy2mcp.discovery import classify, generate, openapi, repo, scan
+from legacy2mcp.discovery import classify, generate, openapi, repo, report, scan
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
 from legacy2mcp.discovery.repo import RepoError
 from legacy2mcp.discovery.scan import ScanResult, SoapFinding
@@ -169,6 +170,12 @@ def _cmd_init(args: argparse.Namespace) -> None:
 
         text = generate.render_yaml(config, source_label, todos)
         out_path = generate.write_config(args.out, text)
+
+        html_path = None
+        if not args.no_html_report:
+            html_out = args.html_out or str(Path(args.out).with_suffix(".html"))
+            html_text = report.render_html(config, source_label, todos)
+            html_path = report.write_report(html_out, html_text)
     except RepoError as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -186,6 +193,8 @@ def _cmd_init(args: argparse.Namespace) -> None:
         tool_count = 1
 
     print(f"Wrote {out_path} ({adapter_type} adapter, {tool_count} tool source(s) detected).", file=sys.stderr)
+    if html_path is not None:
+        print(f"Wrote {html_path} -- a plain-English summary of what this MCP server does.", file=sys.stderr)
     if todos:
         print(f"{len(todos)} TODO(s) left in the file -- review before running.", file=sys.stderr)
     print(f"Next: legacy2mcp inspect --config {out_path}", file=sys.stderr)
@@ -235,6 +244,16 @@ def main() -> None:
         "--scan-only", action="store_true", help="Static analysis only -- skip LLM assist, no API key needed."
     )
     init_parser.add_argument("--out", default="./config.yaml", help="Where to write the generated config.")
+    init_parser.add_argument(
+        "--html-out",
+        help=(
+            "Where to write the plain-English HTML report describing the generated MCP "
+            "server (default: same name as --out, with a .html extension)."
+        ),
+    )
+    init_parser.add_argument(
+        "--no-html-report", action="store_true", help="Skip generating the HTML report."
+    )
     init_parser.set_defaults(func=_cmd_init)
 
     args = parser.parse_args()

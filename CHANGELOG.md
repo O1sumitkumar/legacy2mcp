@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `legacy2mcp init` now also writes a plain-English HTML report next to the
+  generated config (e.g. `config.yaml` -> `config.html`) summarizing, in
+  sentences rather than YAML, what tools the server will expose -- every
+  REST endpoint / DB table / SOAP target found, which ones can change data
+  and are gated behind `allow_write_operations`, and the review TODOs.
+  `--html-out` changes where it's written; `--no-html-report` skips it.
+
+### Fixed
+
+- SOAP adapter: a WSDL exposing the same operation on more than one port of
+  a service (the common ASMX/WCF pattern of a SOAP 1.1 port and a SOAP 1.2
+  port with identical operations -- e.g. the public dneonline Calculator
+  WSDL) crashed `legacy2mcp inspect`/`run` with "Duplicate tool name". The
+  duplicate port's copy of an already-exposed operation is now skipped
+  instead.
+
+## [0.2.2] - 2026-10-13
+
 - Demo GIF and banner/social-preview assets regenerated to show the REST
   adapter and `legacy2mcp init`, not just the original SOAP-only flow.
 - Checked-in MCP client configs (`.mcp.json`, `.cursor/mcp.json`,
@@ -21,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   just write an adapter by hand?" comparison section, and various accuracy
   fixes (numbering, stale labels, literal project name in the H1 and opening
   sentence for discoverability).
+- No functional code changes since 0.2.1 -- cut purely to refresh the PyPI
+  project page's rendered README/metadata.
 
 ## [0.2.1] - 2026-10-10
 
@@ -65,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CLI: `legacy2mcp run --config ...` and `legacy2mcp inspect --config ...`.
 - `stdio` transport.
 
-[Unreleased]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bvenkata/legacy2mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bvenkata/legacy2mcp/releases/tag/v0.1.0

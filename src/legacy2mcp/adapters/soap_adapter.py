@@ -119,6 +119,23 @@ class SoapAdapter(BaseAdapter):
                         )
                         continue
 
+                    tool_name = self._tool_name(op_name)
+                    if tool_name in self._tool_index:
+                        # Common for ASMX/WCF services: the same operation exposed on
+                        # multiple bindings of one service (e.g. a SOAP 1.1 port and a
+                        # SOAP 1.2 port with identical operations). Same operation, same
+                        # schema either way -- keep the first port seen rather than
+                        # registering (and colliding on) a second tool for it.
+                        logger.info(
+                            "Operation '%s' already exposed as tool '%s' via another port "
+                            "on service '%s'; skipping the '%s' port's copy.",
+                            op_name,
+                            tool_name,
+                            service_name,
+                            port_name,
+                        )
+                        continue
+
                     try:
                         input_schema = operation_input_schema(operation)
                         output_schema = operation_output_schema(operation)
@@ -130,7 +147,6 @@ class SoapAdapter(BaseAdapter):
                         )
                         continue
 
-                    tool_name = self._tool_name(op_name)
                     doc = (operation.__doc__ or "").strip()
                     description = (
                         f"SOAP operation '{op_name}' on service '{service_name}' "

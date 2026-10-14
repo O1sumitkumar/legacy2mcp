@@ -31,6 +31,8 @@ def _args(**overrides) -> argparse.Namespace:
         llm_model=DEFAULT_MODEL,
         scan_only=True,
         out="./config.yaml",
+        html_out=None,
+        no_html_report=True,
     )
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -50,6 +52,17 @@ def test_init_from_local_path_writes_loadable_config(tmp_path, monkeypatch):
     assert config.adapters[0].type == "rest"
     rest_settings = config.adapters[0].rest_settings()
     assert rest_settings.endpoints[0].name == "get_widget"
+
+
+def test_init_writes_html_report_alongside_config(tmp_path, monkeypatch):
+    out_path = tmp_path / "config.yaml"
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    _cmd_init(_args(wsdl_url="https://svc.example.com/Legacy?wsdl", out=str(out_path), no_html_report=False))
+
+    html_path = tmp_path / "config.html"
+    assert html_path.exists()
+    assert "https://svc.example.com/Legacy?wsdl" in html_path.read_text()
 
 
 def test_init_requires_a_source_when_noninteractive(tmp_path, monkeypatch):

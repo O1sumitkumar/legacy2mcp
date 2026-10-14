@@ -314,6 +314,14 @@ legacy2mcp inspect --config config.yaml   # review the generated tools
 legacy2mcp run     --config config.yaml   # start the MCP server
 ```
 
+`legacy2mcp init` also writes a plain-English HTML report next to the
+config (e.g. `config.yaml` -> `config.html`) -- open it in a browser to see,
+in sentences rather than YAML, what tools the server will expose (every
+REST endpoint / DB table / SOAP target it found, which ones can change data
+and are gated behind `allow_write_operations`, and the review items above).
+Pass `--html-out` to change where it's written, or `--no-html-report` to
+skip it.
+
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
 
