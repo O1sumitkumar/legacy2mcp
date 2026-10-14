@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded `mcp` 1.29.1 -> 2.3.0. The SDK dropped the `@server.list_tools()`/
+  `@server.call_tool()` decorators the server was built on in favor of
+  constructor-registered `on_list_tools`/`on_call_tool` handlers that return
+  `types.ListToolsResult`/`types.CallToolResult` directly; `server.py` is
+  ported accordingly, including explicitly converting a failed tool call
+  into an error *result* (`isError: true`) rather than letting it surface
+  as a raw exception, which the old decorator used to do implicitly.
+  Verified against a real `ClientSession` over the SDK's in-memory
+  transport (a gap no prior test covered -- every other test called
+  `Legacy2McpApp._dispatch()` directly, bypassing this wiring) and against
+  a real `legacy2mcp run` process via the actual MCP Inspector CLI.
+- Also bumped `oracledb`'s allowed range (`<3` -> `<27`, matching its real
+  versioning scheme) and `actions/checkout`/`actions/setup-python` to v7 in
+  CI.
+
 ## [0.2.5] - 2026-10-13
 
 ### Added

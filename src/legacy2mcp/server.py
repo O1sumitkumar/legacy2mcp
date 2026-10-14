@@ -1,14 +1,16 @@
 """
 The MCP server core.
 
-Deliberately uses the MCP SDK's low-level `Server` (list_tools/call_tool
-handlers) rather than the FastMCP decorator API: FastMCP infers a
-tool's input schema from a Python function's type-hinted signature,
-which works well when you're hand-writing tools but not when tools
-(and their schemas) are discovered dynamically at startup from a WSDL
-that isn't known until config is loaded. The low-level API lets us
-hand it an arbitrary JSON Schema per tool, which is exactly what
-schema.xsd_to_jsonschema produces.
+Deliberately uses the MCP SDK's low-level `Server` (on_list_tools/
+on_call_tool handlers, constructor-registered as of mcp>=2.0 -- 1.x used
+`@server.list_tools()`/`@server.call_tool()` decorators instead; both are
+the same "low-level" API, just a different registration mechanism) rather
+than the MCPServer/FastMCP decorator API: that one infers a tool's input
+schema from a Python function's type-hinted signature, which works well
+when you're hand-writing tools but not when tools (and their schemas) are
+discovered dynamically at startup from a WSDL that isn't known until
+config is loaded. The low-level API lets us hand it an arbitrary JSON
+Schema per tool, which is exactly what schema.xsd_to_jsonschema produces.
 """
 
 from __future__ import annotations
@@ -53,7 +55,6 @@ class Legacy2McpApp:
 
     def __init__(self, config: Legacy2McpConfig):
         self.config = config
-        self.mcp_server = Server(config.server.name)
         self.audit = AuditLogger(
             path=config.security.audit.path, enabled=config.security.audit.enabled
         )
@@ -62,7 +63,15 @@ class Legacy2McpApp:
         self._tools: dict[str, tuple[BaseAdapter, ToolDefinition]] = {}
 
         self._load_adapters()
-        self._register_handlers()
+
+        # Bound methods, not closures defined after construction -- mcp>=2.0
+        # wires on_list_tools/on_call_tool in via the constructor rather than
+        # decorators applied to an already-built Server.
+        self.mcp_server = Server(
+            config.server.name,
+            on_list_tools=self._on_list_tools,
+            on_call_tool=self._on_call_tool,
+        )
 
     def _load_adapters(self) -> None:
         for adapter_config in self.config.adapters:
@@ -95,10 +104,9 @@ class Legacy2McpApp:
                 "enabled and reachable, and that operations aren't all filtered out."
             )
 
-    def _register_handlers(self) -> None:
-        @self.mcp_server.list_tools()
-        async def list_tools() -> list[types.Tool]:
-            return [
+    async def _on_list_tools(self, ctx: Any, params: Any) -> types.ListToolsResult:
+        return types.ListToolsResult(
+            tools=[
                 types.Tool(
                     name=tool_def.name,
                     description=tool_def.description,
@@ -106,11 +114,19 @@ class Legacy2McpApp:
                 )
                 for _, tool_def in self._tools.values()
             ]
+        )
 
-        @self.mcp_server.call_tool()
-        async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[types.TextContent]:
-            arguments = arguments or {}
-            return await self._dispatch(name, arguments)
+    async def _on_call_tool(self, ctx: Any, params: types.CallToolRequestParams) -> types.CallToolResult:
+        arguments = params.arguments or {}
+        try:
+            content = await self._dispatch(params.name, arguments)
+        except Exception as exc:
+            # Tool-execution failures (bad args, adapter/transport errors)
+            # are reported as an error *result*, not a JSON-RPC protocol
+            # error -- that's what lets a client show the LLM what went
+            # wrong instead of surfacing a generic transport failure.
+            return types.CallToolResult(content=[types.TextContent(type="text", text=str(exc))], isError=True)
+        return types.CallToolResult(content=content)
 
     async def _dispatch(self, name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
         if name not in self._tools:
