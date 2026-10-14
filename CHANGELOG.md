@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-14
+
 ### Added
 
 - `skill/legacy2mcp/` -- a [SKILL.md](https://www.agensi.io/learn/what-is-skill-md)
@@ -146,7 +148,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CLI: `legacy2mcp run --config ...` and `legacy2mcp inspect --config ...`.
 - `stdio` transport.
 
-[Unreleased]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/bvenkata/legacy2mcp/compare/v0.2.2...v0.2.3
