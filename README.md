@@ -52,6 +52,7 @@
 - [Point it at your own database](#point-it-at-your-own-database)
 - [Point it at your own REST API](#point-it-at-your-own-rest-api)
 - [Generate a config automatically](#generate-a-config-automatically)
+- [Teach your AI coding agent about legacy2mcp](#teach-your-ai-coding-agent-about-legacy2mcp)
 - [Common commands](#common-commands)
 - [Client support](#client-support)
 - [What's handled](#whats-handled)
@@ -345,6 +346,37 @@ non-interactive/scripted runs. Pass `--no-chat` to opt out.
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
 
+## Teach your AI coding agent about legacy2mcp
+
+The sections above are about the MCP servers `legacy2mcp` *produces*. This
+one is different: it's for when an AI coding agent (Claude Code, Cursor,
+Codex CLI, Gemini CLI, GitHub Copilot, ...) is helping you *build* the
+integration in the first place, and you want it to already know how.
+
+```bash
+legacy2mcp install-skill
+```
+
+This writes short, command-first legacy2mcp instructions directly into the
+current repo's own agent context files — a Claude Code slash command
+(`.claude/commands/legacy2mcp.md`), a Cursor rule
+(`.cursor/rules/legacy2mcp.mdc`), and a `## legacy2mcp` section appended (or
+updated in place) in `AGENTS.md`, `GEMINI.md`, and
+`.github/copilot-instructions.md`. The agent then already knows the core
+workflow — which `init` flag fits which source, review the `# TODO`s before
+trusting a generated config, check `inspect` before running anything live —
+without you re-explaining it every session. It's idempotent: re-running it
+replaces its own section rather than duplicating it, so it's safe to run
+again after an upgrade. Review what it writes and commit it so your whole
+team gets the same instructions (this repo does exactly that — see
+[AGENTS.md](AGENTS.md)).
+
+There's also a standalone [`SKILL.md`](skill/legacy2mcp/) in this repo,
+written to the open [Agent Skills standard](https://www.agensi.io/learn/what-is-skill-md)
+— the same know-how in a form marketplaces like [Agensi](https://www.agensi.io)
+can list independently of any particular repo, for agents that discover
+skills that way instead.
+
 ## Common commands
 
 ```bash
@@ -369,9 +401,8 @@ legacy2mcp inspect --config config.yaml > tools.json
 # Start the MCP server (stdio)
 legacy2mcp run --config config.yaml
 
-# Teach the AI coding agent working in *this* repo how to drive legacy2mcp --
-# writes/updates CLAUDE.md-style context files (Claude Code, Cursor, AGENTS.md,
-# GEMINI.md, GitHub Copilot). Safe to re-run; review and commit what it writes.
+# Teach the AI coding agent working in *this* repo how to drive legacy2mcp
+# (see "Teach your AI coding agent about legacy2mcp" above)
 legacy2mcp install-skill
 ```
 
