@@ -33,7 +33,7 @@
 
 <p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, or REST API into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
-<img src="assets/quickstart.svg" alt="Three-step quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools" width="820">
+<img src="assets/quickstart.svg" alt="Quick start: pip install legacy2mcp, legacy2mcp init --rest-url against the public Swagger Petstore to write config.yaml, then paste this MCP config into Claude Desktop, Cursor, or VS Code so the client starts the server itself and its tools show up" width="820">
 
 </div>
 

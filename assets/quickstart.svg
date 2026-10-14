@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="260" viewBox="0 0 1040 260" role="img" aria-label="Three-step quick start: pip install legacy2mcp, legacy2mcp init --rest-url against the public Swagger Petstore, then legacy2mcp inspect to see the generated MCP tools">
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="430" viewBox="0 0 1040 430" role="img" aria-label="Quick start: pip install legacy2mcp, legacy2mcp init --rest-url against the public Swagger Petstore to write config.yaml, then paste this MCP config into Claude Desktop, Cursor, or VS Code so the client starts the server itself and its tools show up">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0b1220"/>
@@ -10,7 +10,7 @@
     </linearGradient>
   </defs>
 
-  <rect x="1" y="1" width="1038" height="258" rx="20" fill="url(#bg)" stroke="#2a3350" stroke-width="1.5"/>
+  <rect x="1" y="1" width="1038" height="428" rx="20" fill="url(#bg)" stroke="#2a3350" stroke-width="1.5"/>
 
   <circle cx="28" cy="28" r="6" fill="#ff5f56"/>
   <circle cx="50" cy="28" r="6" fill="#ffbd2e"/>
@@ -18,13 +18,26 @@
   <text x="1012" y="33" text-anchor="end" fill="#5b657f" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="12.5" font-weight="600" letter-spacing="1">QUICK START</text>
   <path d="M20 52 H1020" stroke="#1c2540" stroke-width="1.5"/>
 
-  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="18" xml:space="preserve">
-    <text x="40" y="100" xml:space="preserve"><tspan fill="url(#accent)" font-weight="700">$&#160;</tspan><tspan fill="#eef1f8">pip install legacy2mcp</tspan></text>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" xml:space="preserve">
+    <text x="40" y="88" font-size="17" xml:space="preserve"><tspan fill="url(#accent)" font-weight="700">$&#160;</tspan><tspan fill="#eef1f8">pip install legacy2mcp</tspan></text>
 
-    <text x="40" y="150" xml:space="preserve"><tspan fill="url(#accent)" font-weight="700">$&#160;</tspan><tspan fill="#eef1f8">legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml</tspan></text>
-
-    <text x="40" y="200" xml:space="preserve"><tspan fill="url(#accent)" font-weight="700">$&#160;</tspan><tspan fill="#eef1f8">legacy2mcp inspect --config config.yaml</tspan><tspan fill="#5b657f">&#160;&#160;&#160;# see the generated MCP tools</tspan></text>
+    <text x="40" y="128" font-size="17" xml:space="preserve"><tspan fill="url(#accent)" font-weight="700">$&#160;</tspan><tspan fill="#eef1f8">legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3" --out config.yaml</tspan></text>
+    <text x="58" y="150" font-size="13.5" fill="#6fe39a" xml:space="preserve">Wrote config.yaml (rest adapter, 19 tool source(s) detected).</text>
   </g>
 
-  <text x="40" y="238" fill="#5b657f" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="500">No API key, no cloning -- works against the public Swagger Petstore out of the box.</text>
+  <text x="40" y="188" fill="#aab2c8" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="14.5" font-weight="500">Paste this into Claude Desktop / Cursor / VS Code's MCP config, then restart -- the client starts the server itself:</text>
+
+  <rect x="40" y="206" width="960" height="180" rx="10" fill="#0f1830" stroke="#28325a" stroke-width="1.25"/>
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" xml:space="preserve">
+    <text x="58" y="230" xml:space="preserve"><tspan fill="#c7cedd">{</tspan></text>
+    <text x="58" y="250" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;</tspan><tspan fill="#6fe39a">"mcpServers"</tspan><tspan fill="#c7cedd">: {</tspan></text>
+    <text x="58" y="270" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;&#160;&#160;</tspan><tspan fill="#6fe39a">"legacy2mcp-petstore"</tspan><tspan fill="#c7cedd">: {</tspan></text>
+    <text x="58" y="290" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;&#160;&#160;&#160;&#160;</tspan><tspan fill="#6fe39a">"command"</tspan><tspan fill="#c7cedd">: </tspan><tspan fill="#6fe39a">"legacy2mcp"</tspan><tspan fill="#c7cedd">,</tspan></text>
+    <text x="58" y="310" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;&#160;&#160;&#160;&#160;</tspan><tspan fill="#6fe39a">"args"</tspan><tspan fill="#c7cedd">: [</tspan><tspan fill="#6fe39a">"run"</tspan><tspan fill="#c7cedd">, </tspan><tspan fill="#6fe39a">"--config"</tspan><tspan fill="#c7cedd">, </tspan><tspan fill="#6fe39a">"/absolute/path/to/config.yaml"</tspan><tspan fill="#c7cedd">]</tspan></text>
+    <text x="58" y="330" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;&#160;&#160;}</tspan></text>
+    <text x="58" y="350" xml:space="preserve"><tspan fill="#c7cedd">&#160;&#160;}</tspan></text>
+    <text x="58" y="370" xml:space="preserve"><tspan fill="#c7cedd">}</tspan></text>
+  </g>
+
+  <text x="40" y="410" fill="#5b657f" font-family="ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" font-weight="500">Use an absolute path to config.yaml. Its tools (getPetById, findPetsByStatus, ...) show up automatically -- no server command to run by hand.</text>
 </svg>
