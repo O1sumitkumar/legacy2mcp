@@ -368,6 +368,11 @@ legacy2mcp inspect --config config.yaml > tools.json
 
 # Start the MCP server (stdio)
 legacy2mcp run --config config.yaml
+
+# Teach the AI coding agent working in *this* repo how to drive legacy2mcp --
+# writes/updates CLAUDE.md-style context files (Claude Code, Cursor, AGENTS.md,
+# GEMINI.md, GitHub Copilot). Safe to re-run; review and commit what it writes.
+legacy2mcp install-skill
 ```
 
 ## Client support

@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   trusting it, and carrying the read-only/audit-logged safety posture into
   its recommendations. `references/sources.md` has the per-source-type
   detail (SOAP/WSDL, REST, GitHub-repo scan, database).
+- `legacy2mcp install-skill`: writes/updates legacy2mcp usage instructions
+  directly into a project's own AI-assistant context files -- a Claude Code
+  slash command (`.claude/commands/legacy2mcp.md`), a Cursor rule
+  (`.cursor/rules/legacy2mcp.mdc`), and a `## legacy2mcp` section in
+  `AGENTS.md` / `GEMINI.md` / `.github/copilot-instructions.md`. Idempotent
+  (re-running updates its own section in place rather than duplicating it),
+  same pattern other CLI tools (e.g. DockSec) use so an assistant already
+  working in a repo picks up how to drive the tool without a separate
+  marketplace lookup.
 
 ### Changed
 

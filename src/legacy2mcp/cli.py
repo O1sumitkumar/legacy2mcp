@@ -15,6 +15,7 @@ from legacy2mcp.discovery import classify, generate, openapi, repo, report, scan
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
 from legacy2mcp.discovery.repo import RepoError
 from legacy2mcp.discovery.scan import ScanResult, SoapFinding
+from legacy2mcp.install_skill import install_skill
 from legacy2mcp.server import Legacy2McpApp
 
 
@@ -58,6 +59,10 @@ def _cmd_inspect(args: argparse.Namespace) -> None:
         print(json.dumps(tools, indent=2, default=str))
     finally:
         app.close()
+
+
+def _cmd_install_skill(args: argparse.Namespace) -> None:
+    install_skill(args.project_root)
 
 
 def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, str]:
@@ -268,6 +273,20 @@ def main() -> None:
     )
     inspect_parser.add_argument("--config", required=True, help="Path to config.yaml")
     inspect_parser.set_defaults(func=_cmd_inspect)
+
+    install_skill_parser = subparsers.add_parser(
+        "install-skill",
+        help=(
+            "Write legacy2mcp usage instructions into this repo's AI-assistant context "
+            "files (Claude Code, Cursor, AGENTS.md, GEMINI.md, GitHub Copilot) so an "
+            "assistant working here already knows how to drive legacy2mcp. Safe to "
+            "re-run -- it updates its own section in place."
+        ),
+    )
+    install_skill_parser.add_argument(
+        "--project-root", default=None, help="Repo root to write into (default: current directory)."
+    )
+    install_skill_parser.set_defaults(func=_cmd_install_skill)
 
     init_parser = subparsers.add_parser(
         "init",
