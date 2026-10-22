@@ -98,14 +98,26 @@ it in production.
    an environment variable named by `--db-dsn-env`, never written to
    disk) -- but only to read the procedure/function catalog; no procedure
    is ever invoked by `discover`.
-6. **`--webpage-url` only ever does one `GET` of the page you give it** --
-   no JavaScript is executed, no link is followed, and no `<form>` it
-   finds is ever submitted. A hidden input's *value* is never persisted
-   (it may be a per-request token such as CSRF, which a static scan can't
-   resolve anyway) -- only its field name, flagged `needs_review`. Like
-   `--rest-url`'s OpenAPI probe, this does fetch a URL you supply, so the
-   same caution that applies to pointing `legacy2mcp` at any live
-   endpoint applies here too.
+6. **`--webpage-url` crawls same-site pages only, bounded, and never
+   executes anything.** Starting from the URL you give it, it follows
+   `<a href>` links found in each page's static HTML, up to `--max-pages`
+   (default 25) and `--max-depth` (default 2) -- both bounds exist
+   specifically so this stays a small, deliberate crawl and never an
+   open-ended one. A link is only ever followed if it resolves to the
+   *same host* as the URL you gave (`www.`-prefix differences are treated
+   as the same host; a different host entirely, including a form's own
+   `action`, is never fetched) -- it cannot wander off to crawl a
+   different site. No JavaScript is executed on any page, and no `<form>`
+   it finds is ever submitted. A hidden input's *value* is never
+   persisted (it may be a per-request token such as CSRF, which a static
+   scan can't resolve anyway) -- only its field name, flagged
+   `needs_review`. A page with no form becomes a read-only "get this
+   page" operation whose only output is that page's extracted text (see
+   `legacy2mcp/htmltext.py`) -- never anything beyond what the page's own
+   static HTML already made public. Like `--rest-url`'s OpenAPI probe,
+   this does fetch URLs you point it at, so the same caution that applies
+   to pointing `legacy2mcp` at any live endpoint applies here too -- only
+   point it at a site you're authorized to crawl.
 
 What it does *not* do yet: path-templating for `--har-file` and
 `--webpage-url` is a simple per-entry heuristic (numeric/UUID-shaped

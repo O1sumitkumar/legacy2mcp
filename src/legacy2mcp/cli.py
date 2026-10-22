@@ -87,7 +87,9 @@ def _cmd_discover(args: argparse.Namespace) -> None:
             contract = queue_contract.load_queue_contract(args.queue_config)
             source_label = args.queue_config
         elif args.webpage_url:
-            contract = webpage.contract_from_webpage(args.webpage_url)
+            contract = webpage.contract_from_webpage(
+                args.webpage_url, max_pages=args.max_pages, max_depth=args.max_depth
+            )
             source_label = args.webpage_url
         elif args.stored_procs:
             if not args.db_dialect:
@@ -391,14 +393,23 @@ def main() -> None:
     discover_source_group.add_argument(
         "--webpage-url",
         help=(
-            "A live webpage with no API docs at all -- fetches it and turns every <form> in its "
-            "static HTML into a REST operation (method, action, one field per input/select/"
-            "textarea). No JavaScript is executed and nothing is ever submitted. Lowest "
-            "confidence of any source, same as --har-file: every operation flagged for review."
+            "A live website with no API docs at all -- crawls same-site pages starting here "
+            "(follows <a href> links, --max-pages/--max-depth bound it) and turns every <form> "
+            "found into a REST operation (method, action, one field per input/select/textarea), "
+            "plus one read-only 'get this page' operation per page that has no form but does "
+            "have real text content. No JavaScript is executed, no link off-site is followed, "
+            "and nothing is ever submitted. Lowest confidence of any source, same as --har-file: "
+            "every operation flagged for review."
         ),
     )
     discover_source_group.add_argument(
         "--stored-procs", action="store_true", help="Introspect a live database's stored-procedure/function catalog."
+    )
+    discover_parser.add_argument(
+        "--max-pages", type=int, default=25, help="Max pages to crawl for --webpage-url (default: 25)."
+    )
+    discover_parser.add_argument(
+        "--max-depth", type=int, default=2, help="Max link depth to follow for --webpage-url (default: 2)."
     )
     discover_parser.add_argument(
         "--db-dialect", choices=["postgres", "mssql", "oracle"], help="Required with --stored-procs."

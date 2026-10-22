@@ -392,19 +392,25 @@ A few things worth knowing:
   (`mitmdump --set hardump=out.har`, or "Export as HAR" in the GUI). This
   is the lowest-confidence source (inferred from whatever was sampled, not
   a declared contract) -- every operation comes back flagged for review.
-- **`--webpage-url`** is for the legacy web app that has no OpenAPI spec,
-  no Postman collection, and nobody around who remembers capturing a HAR
-  -- just a URL in a browser. It fetches that one page and turns every
-  `<form>` in its static HTML into an operation: the form's method and
-  action become the REST method/path, and each `<input>`/`<select>`/
-  `<textarea>` becomes a typed field (a `<select>`'s options, or a group of
-  radio/checkbox inputs sharing a name, become an `enum`). No JavaScript is
-  executed and nothing is ever submitted -- it's a single `GET` of the page
-  plus HTML parsing. Same lowest-confidence posture as `--har-file`, with
-  one extra caveat: HTML forms normally POST as
-  `application/x-www-form-urlencoded`, but the REST adapter always sends a
-  JSON body, so every non-GET form gets a note to double-check that the
-  backend actually accepts JSON before you rely on it.
+- **`--webpage-url`** is for the legacy web app -- or the plain content
+  site -- that has no OpenAPI spec, no Postman collection, and nobody
+  around who remembers capturing a HAR, just a URL in a browser. It
+  crawls same-site pages starting there (following `<a href>` links,
+  bounded by `--max-pages`/`--max-depth`, default 25 pages / depth 2) and
+  turns every `<form>` it finds into an operation (method/action become
+  the REST method/path, each `<input>`/`<select>`/`<textarea>` a typed
+  field -- a `<select>`'s options, or a group of radio/checkbox inputs
+  sharing a name, become an `enum`), plus one read-only "get this page"
+  tool per page that has no form but does have real text content --
+  calling that tool returns the page's extracted text, not a structured
+  API response. No JavaScript is executed, no link off the starting
+  site's host is ever followed, and no form is ever submitted -- every
+  page is a single `GET` plus HTML parsing. Same lowest-confidence
+  posture as `--har-file`, with one extra caveat on form operations:
+  HTML forms normally POST as `application/x-www-form-urlencoded`, but
+  the REST adapter always sends a JSON body, so every non-GET form gets
+  a note to double-check that the backend actually accepts JSON before
+  you rely on it.
 - **Stored procedures and queue descriptions are documented, not runnable
   yet.** `--stored-procs` and `--queue-config` still produce real contract
   entries -- there's no adapter to actually *call* either today (see

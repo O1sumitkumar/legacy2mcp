@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-21
+
+### Changed
+
+- **`--webpage-url` now crawls, instead of reading a single page.**
+  Starting from the URL given, it follows same-site `<a href>` links
+  (bounded by new `--max-pages`/`--max-depth` flags, default 25/2) and,
+  for every page with no `<form>` but real text content, adds a
+  read-only "get this page" operation whose tool returns the page's
+  extracted text -- so a plain content site (no forms anywhere) now
+  produces a usable contract instead of erroring with "no `<form>`
+  elements found". Off-site links are never followed.
+- **`adapters/rest_adapter.py`** now strips HTML down to plain text
+  (`legacy2mcp/htmltext.py`) when a REST endpoint's response isn't JSON
+  but is HTML, instead of returning the raw markup -- matters for the
+  "get this page" tools above, and for any legacy REST endpoint that
+  happens to answer with an HTML page.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

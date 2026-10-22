@@ -150,6 +150,15 @@ class RestAdapter(BaseAdapter):
         try:
             return response.json()
         except ValueError:
+            content_type = response.headers.get("Content-Type", "")
+            if "html" in content_type.lower():
+                # A legacy app with no real JSON API (or exactly a
+                # discovery/webpage.py "read this page" tool) returns a
+                # full HTML document here -- strip markup rather than
+                # handing the caller a page's worth of tags.
+                from legacy2mcp.htmltext import html_to_text
+
+                return {"text": html_to_text(response.text)}
             return {"text": response.text}
 
     def close(self) -> None:

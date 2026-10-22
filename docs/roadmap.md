@@ -71,10 +71,12 @@
   a HAR traffic capture (`--har-file` -- from browser devtools, Postman's
   own capture, or mitmproxy's built-in `mitmdump --set hardump=out.har`
   exporter; legacy2mcp never drives a capture proxy itself), a small
-  hand-written queue description (`--queue-config`), or a plain webpage
-  with no API docs at all (`--webpage-url` -- fetches the page and turns
-  every `<form>` in its static HTML into a REST operation; no JavaScript
-  executed, nothing ever submitted). Writes a Legacy
+  hand-written queue description (`--queue-config`), or a plain website
+  with no API docs at all (`--webpage-url` -- crawls same-site pages
+  starting there, bounded by `--max-pages`/`--max-depth`, and turns every
+  `<form>` it finds into a REST operation plus one read-only "get this
+  page" tool per page with real text content and no form; no JavaScript
+  executed, no off-site link followed, nothing ever submitted). Writes a Legacy
   Interface Contract (`contract.yaml`): every operation's inputs, outputs,
   enums, error codes, read/write side effect, and a confidence level (how
   the finding was made -- a live catalog vs. a curated artifact vs.
