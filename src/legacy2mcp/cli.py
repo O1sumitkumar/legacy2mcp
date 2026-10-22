@@ -11,7 +11,8 @@ from pathlib import Path
 
 from legacy2mcp import webui
 from legacy2mcp.config import load_config
-from legacy2mcp.discovery import classify, generate, openapi, repo, report, scan
+from legacy2mcp.discovery import classify, generate, har, openapi, postman, queue_contract, repo, report, scan, storedproc, webpage
+from legacy2mcp.discovery.contract import ContractError, load_contract
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
 from legacy2mcp.discovery.repo import RepoError
 from legacy2mcp.discovery.scan import ScanResult, SoapFinding
@@ -65,8 +66,71 @@ def _cmd_install_skill(args: argparse.Namespace) -> None:
     install_skill(args.project_root)
 
 
+def _cmd_discover(args: argparse.Namespace) -> None:
+    """Discover a legacy interface's real shape -- operations, inputs,
+    enums, error codes, confidence -- into a human-reviewable contract.yaml,
+    *before* generating a runnable server from it. See `legacy2mcp init
+    --from-contract` for the next step."""
+    try:
+        if args.postman_file:
+            contract = postman.contract_from_postman(args.postman_file)
+            source_label = args.postman_file
+        elif args.har_file:
+            extra_headers = frozenset(h.lower() for h in (args.redact_header or []))
+            contract = har.contract_from_har(args.har_file, extra_sensitive_headers=extra_headers)
+            source_label = args.har_file
+        elif args.openapi_file:
+            spec = openapi.load_spec_from_file(args.openapi_file)
+            contract = openapi.contract_from_spec(spec, args.openapi_file)
+            source_label = args.openapi_file
+        elif args.queue_config:
+            contract = queue_contract.load_queue_contract(args.queue_config)
+            source_label = args.queue_config
+        elif args.webpage_url:
+            contract = webpage.contract_from_webpage(args.webpage_url)
+            source_label = args.webpage_url
+        elif args.stored_procs:
+            if not args.db_dialect:
+                print("--stored-procs needs --db-dialect {postgres,mssql,oracle}.", file=sys.stderr)
+                sys.exit(1)
+            dsn = os.environ.get(args.db_dsn_env or "")
+            if dsn is None:
+                print(f"Environment variable '{args.db_dsn_env}' is not set.", file=sys.stderr)
+                sys.exit(1)
+            contract = storedproc.contract_from_stored_procedures(args.db_dialect, dsn, db_schema=args.db_schema)
+            source_label = f"{args.db_dialect} database"
+        else:
+            print(
+                "Pass one of --postman-file, --openapi-file, --har-file, --queue-config, "
+                "--webpage-url, or --stored-procs (with --db-dialect and --db-dsn-env).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    except ContractError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    text = generate.render_contract_yaml(contract, source_label)
+    out_path = generate.write_config(args.out, text)
+
+    by_confidence: dict[str, int] = {}
+    needs_review_count = 0
+    for op in contract.operations:
+        by_confidence[op.confidence] = by_confidence.get(op.confidence, 0) + 1
+        if op.needs_review:
+            needs_review_count += 1
+    summary = ", ".join(f"{count} {level}-confidence" for level, count in sorted(by_confidence.items())) or "none"
+
+    print(
+        f"Wrote {out_path} ({len(contract.operations)} operation(s): {summary}, "
+        f"{needs_review_count} flagged for review).",
+        file=sys.stderr,
+    )
+    print(f"Next: legacy2mcp init --from-contract {out_path} --out config.yaml", file=sys.stderr)
+
+
 def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, str]:
-    """Return (kind, value): kind is "wsdl" / "rest" / "github_url" / "local_path"."""
+    """Return (kind, value): kind is "wsdl" / "rest" / "github_url" / "local_path" / "from_contract"."""
     if args.wsdl_url:
         return "wsdl", args.wsdl_url
     if args.rest_url:
@@ -75,9 +139,14 @@ def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, s
         return "github_url", args.github_url
     if args.local_path:
         return "local_path", args.local_path
+    if args.from_contract:
+        return "from_contract", args.from_contract
 
     if not interactive:
-        print("Pass one of --wsdl-url, --rest-url, --github-url, or --local-path.", file=sys.stderr)
+        print(
+            "Pass one of --wsdl-url, --rest-url, --github-url, --local-path, or --from-contract.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     print("What do you want to point legacy2mcp at?")
@@ -151,6 +220,11 @@ def _cmd_init(args: argparse.Namespace) -> None:
                 routes = []
             config, todos = classify.build_config(ScanResult(routes=routes), base_url=value)
 
+        elif kind == "from_contract":
+            source_label = value
+            contract = load_contract(value)
+            config, todos = classify.build_config_from_contract(contract)
+
         else:  # github_url / local_path
             llm = _resolve_llm(args, interactive)
             if kind == "local_path":
@@ -182,7 +256,7 @@ def _cmd_init(args: argparse.Namespace) -> None:
             html_out = args.html_out or str(Path(args.out).with_suffix(".html"))
             html_text = report.render_html(config, source_label, todos)
             html_path = report.write_report(html_out, html_text)
-    except RepoError as exc:
+    except (RepoError, ContractError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
     finally:
@@ -288,6 +362,63 @@ def main() -> None:
     )
     install_skill_parser.set_defaults(func=_cmd_install_skill)
 
+    discover_parser = subparsers.add_parser(
+        "discover",
+        help=(
+            "Discover a legacy interface's real shape (operations, inputs, enums, error "
+            "codes, confidence) into a human-reviewable contract.yaml, before `init "
+            "--from-contract` turns it into a runnable server. Covers formats `init` "
+            "can't read directly: Postman collections, local OpenAPI/Swagger files, a "
+            "database's stored-procedure catalog, declarative queue definitions, and a "
+            "plain webpage's HTML forms."
+        ),
+    )
+    discover_source_group = discover_parser.add_mutually_exclusive_group()
+    discover_source_group.add_argument("--postman-file", help="A Postman Collection (v2.1 schema) JSON file.")
+    discover_source_group.add_argument("--openapi-file", help="A local OpenAPI/Swagger spec file (JSON or YAML).")
+    discover_source_group.add_argument(
+        "--har-file",
+        help=(
+            "A HAR (HTTP Archive) capture -- from browser devtools' 'Export HAR', mitmproxy's "
+            "built-in HAR exporter (mitmdump --set hardump=out.har), Postman's traffic capture, "
+            "or anything else that produces standard HAR. Lowest confidence of any source: "
+            "inferred from sampled traffic, every operation flagged for review."
+        ),
+    )
+    discover_source_group.add_argument(
+        "--queue-config", help="A small YAML file describing known queues (see discovery/queue_contract.py for the shape)."
+    )
+    discover_source_group.add_argument(
+        "--webpage-url",
+        help=(
+            "A live webpage with no API docs at all -- fetches it and turns every <form> in its "
+            "static HTML into a REST operation (method, action, one field per input/select/"
+            "textarea). No JavaScript is executed and nothing is ever submitted. Lowest "
+            "confidence of any source, same as --har-file: every operation flagged for review."
+        ),
+    )
+    discover_source_group.add_argument(
+        "--stored-procs", action="store_true", help="Introspect a live database's stored-procedure/function catalog."
+    )
+    discover_parser.add_argument(
+        "--db-dialect", choices=["postgres", "mssql", "oracle"], help="Required with --stored-procs."
+    )
+    discover_parser.add_argument(
+        "--db-dsn-env", help="Env var holding the DB connection string (required with --stored-procs)."
+    )
+    discover_parser.add_argument("--db-schema", help="Schema/owner to introspect (--stored-procs only).")
+    discover_parser.add_argument(
+        "--redact-header",
+        action="append",
+        help=(
+            "A header name (beyond the built-in list -- Authorization, Cookie, etc.) whose "
+            "presence should produce an auth note instead of being treated as a typed field. "
+            "Repeatable. --har-file only."
+        ),
+    )
+    discover_parser.add_argument("--out", default="./contract.yaml", help="Where to write the generated contract.")
+    discover_parser.set_defaults(func=_cmd_discover)
+
     init_parser = subparsers.add_parser(
         "init",
         help=(
@@ -301,6 +432,10 @@ def main() -> None:
     source_group.add_argument("--rest-url", help="A live REST API base URL; tries OpenAPI/Swagger discovery against it.")
     source_group.add_argument("--github-url", help="Repo to clone and statically scan for a SOAP client / DB model / routes.")
     source_group.add_argument("--local-path", help="Already-checked-out repo to scan (skips cloning).")
+    source_group.add_argument(
+        "--from-contract",
+        help="A contract.yaml written by `legacy2mcp discover` -- turns its reviewed operations into a runnable config.",
+    )
     init_parser.add_argument(
         "--github-token-env", help="Env var holding a GitHub token, for private repos (--github-url only)."
     )

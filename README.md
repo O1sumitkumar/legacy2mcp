@@ -52,6 +52,7 @@
 - [Point it at your own database](#point-it-at-your-own-database)
 - [Point it at your own REST API](#point-it-at-your-own-rest-api)
 - [Generate a config automatically](#generate-a-config-automatically)
+- [Discover a legacy interface before generating a server](#discover-a-legacy-interface-before-generating-a-server)
 - [Teach your AI coding agent about legacy2mcp](#teach-your-ai-coding-agent-about-legacy2mcp)
 - [Common commands](#common-commands)
 - [Client support](#client-support)
@@ -346,6 +347,74 @@ non-interactive/scripted runs. Pass `--no-chat` to opt out.
 See [docs/security.md](docs/security.md) for exactly what this heuristic
 does and doesn't guarantee before pointing it at anything real.
 
+## Discover a legacy interface before generating a server
+
+`init` covers a live WSDL, a live REST URL, and a repo it can scan. For
+everything else -- a Postman collection someone already built, an OpenAPI
+spec file sitting in a repo with no server running yet, a database's
+stored-procedure catalog, a HAR capture of real traffic, queues you
+already know about, or a plain webpage with no API docs at all -- there's
+an explicit step first:
+
+```bash
+legacy2mcp discover --postman-file my-collection.json --out contract.yaml
+legacy2mcp discover --openapi-file spec.yaml --out contract.yaml
+legacy2mcp discover --har-file traffic.har --out contract.yaml
+legacy2mcp discover --stored-procs --db-dialect postgres --db-dsn-env LEGACY_DB_DSN --out contract.yaml
+legacy2mcp discover --queue-config queues.yaml --out contract.yaml
+legacy2mcp discover --webpage-url "https://your-legacy-app.example.com/some-page" --out contract.yaml
+```
+
+Each writes a **Legacy Interface Contract** (`contract.yaml`): every
+operation's inputs, outputs, enums, error codes, whether it reads or
+writes, and a **confidence level** -- `high` for a live schema/catalog,
+`medium` for a curated artifact like a Postman collection, `low` for
+anything inferred from sampled traffic -- plus `needs_review` flags and
+notes on anything uncertain. Review it like you'd review `config.yaml`'s
+`# TODO`s, then turn it into a runnable server:
+
+```bash
+legacy2mcp init --from-contract contract.yaml --out config.yaml
+```
+
+A few things worth knowing:
+
+- **No raw secret is ever written into a contract.** A Postman collection's
+  saved bearer token, a HAR capture's `Authorization`/`Cookie` header
+  values -- none of it gets persisted; only a note that auth was present,
+  for you to configure yourself. The one controlled exception is a small,
+  non-sensitive-looking **enum** (e.g. a `status` field that only ever took
+  a handful of values across enough samples to mean something) -- see
+  [docs/security.md](docs/security.md).
+- **For `--har-file`**, legacy2mcp never drives a capture proxy itself --
+  point it at a HAR produced by anything: your browser devtools' "Export
+  HAR", Postman's own traffic capture, or mitmproxy's built-in exporter
+  (`mitmdump --set hardump=out.har`, or "Export as HAR" in the GUI). This
+  is the lowest-confidence source (inferred from whatever was sampled, not
+  a declared contract) -- every operation comes back flagged for review.
+- **`--webpage-url`** is for the legacy web app that has no OpenAPI spec,
+  no Postman collection, and nobody around who remembers capturing a HAR
+  -- just a URL in a browser. It fetches that one page and turns every
+  `<form>` in its static HTML into an operation: the form's method and
+  action become the REST method/path, and each `<input>`/`<select>`/
+  `<textarea>` becomes a typed field (a `<select>`'s options, or a group of
+  radio/checkbox inputs sharing a name, become an `enum`). No JavaScript is
+  executed and nothing is ever submitted -- it's a single `GET` of the page
+  plus HTML parsing. Same lowest-confidence posture as `--har-file`, with
+  one extra caveat: HTML forms normally POST as
+  `application/x-www-form-urlencoded`, but the REST adapter always sends a
+  JSON body, so every non-GET form gets a note to double-check that the
+  backend actually accepts JSON before you rely on it.
+- **Stored procedures and queue descriptions are documented, not runnable
+  yet.** `--stored-procs` and `--queue-config` still produce real contract
+  entries -- there's no adapter to actually *call* either today (see
+  [docs/roadmap.md](docs/roadmap.md)), so `init --from-contract` skips them
+  with a clear TODO rather than pretending they work.
+- **Every generated server also gets a `describe_capabilities` tool** for
+  free -- a connected agent can call it to ask "what can this system do?"
+  (every tool's description, side effect, confidence, required fields,
+  known error codes) before calling anything for real.
+
 ## Teach your AI coding agent about legacy2mcp
 
 The sections above are about the MCP servers `legacy2mcp` *produces*. This
@@ -543,6 +612,8 @@ Passing secrets and troubleshooting: [docs/clients.md](docs/clients.md).
 | **Transport** | `stdio` (the transport Claude Desktop and most agent frameworks spawn) |
 | **DB dialects** | Postgres, SQL Server, Oracle — table allowlist (`select`/`insert`) with live schema introspection, plus named parameterized queries |
 | **REST** | explicit endpoint allowlist (method + path + typed params) from config or `legacy2mcp init` — no live schema to introspect, so nothing here is verified until you run it |
+| **Discover sources** | Postman collections, local OpenAPI/Swagger files, a live DB's stored-procedure catalog, HAR traffic captures, declarative queue descriptions → a reviewable `contract.yaml` (confidence, enums, error codes) → `legacy2mcp init --from-contract` |
+| **`describe_capabilities`** | every generated server exposes this meta-tool for free — an agent can ask what the server can do before calling anything |
 
 See [docs/security.md](docs/security.md) for the full, honest security model — what's covered today and what isn't yet.
 
@@ -565,6 +636,7 @@ See [docs/security.md](docs/security.md) for the full, honest security model —
 - **Adapter calls go exactly where you pointed them, nowhere else.** SOAP calls go to your `wsdl_url`, DB calls go to your `dsn_env` connection, REST calls go to your `base_url`.
 - **`legacy2mcp init`'s discovery calls are scoped to what you gave it.** The WSDL and REST(OpenAPI) paths only ever contact the URL you passed. The GitHub/source-code path clones the repo you specify and parses it locally with `ast` — nothing from it is ever executed.
 - **The optional LLM-assist step sends only already-detected, ambiguous fragments — never your repo.** It only runs on the GitHub/source-code path of `legacy2mcp init`, only if you provide an API key, and only sends the specific route names/paths/params the static scan already flagged as ambiguous, not a dump of your source. Skip it entirely with `--scan-only`.
+- **`legacy2mcp discover` reads local files, except `--stored-procs`.** Postman/OpenAPI/HAR/queue sources never touch the network — they read a file you gave it. `--stored-procs` connects to the DSN in the env var you named, the same way the `db` adapter does, only to read the procedure/function catalog. No raw secret or sampled value is ever written into the resulting `contract.yaml` — see [docs/security.md](docs/security.md).
 - **Secrets never live in `config.yaml`.** Passwords, DSNs, and API tokens are all referenced by environment-variable name (`password_env`, `dsn_env`, `token_env`) and read at runtime — the YAML stays safe to commit.
 - **The audit log stays local and is not encrypted at rest.** Every tool call is appended as one JSON line to `security.audit.path`. Arguments are logged as-is — there's no PII redaction; see [docs/security.md](docs/security.md) for the full list of what the audit log does and doesn't do.
 
@@ -656,7 +728,9 @@ Call the same generated, validated tools from your own code via any MCP client l
 | `adapters[].config.timeout_seconds` | `15` | per-call HTTP timeout |
 | `adapters[].config.endpoints[].name` / `.method` / `.path` / `.description` | — | one allowlisted endpoint; `path` uses `{param}` placeholders for path params |
 | `adapters[].config.endpoints[].params[].name` / `.location` / `.type` / `.required` | — | `location` is `path`, `query`, or `body` |
+| `adapters[].config.endpoints[].params[].enum` | unset | a closed set of allowed values, enforced by schema validation — not just descriptive |
 | `adapters[].config.endpoints[].write` | `false` | gates this endpoint behind `allow_write_operations` |
+| `adapters[].config.endpoints[].confidence` / `.error_codes` / `.needs_review` | unset / `[]` / `false` | only ever populated by `legacy2mcp discover` + `init --from-contract` — how much to trust the finding, known error responses, and whether a human should look at it |
 
 **Security config:**
 

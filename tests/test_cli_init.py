@@ -27,6 +27,7 @@ def _args(**overrides) -> argparse.Namespace:
         rest_url=None,
         github_url=None,
         local_path=None,
+        from_contract=None,
         github_token_env=None,
         llm_api_key_env=None,
         llm_base_url=DEFAULT_BASE_URL,
@@ -162,3 +163,37 @@ def test_init_from_rest_url_uses_openapi_discovery(tmp_path, monkeypatch):
     rest_settings = config.adapters[0].rest_settings()
     assert rest_settings.base_url == "https://api.example.com"
     assert rest_settings.endpoints[0].name == "get_widget"
+
+
+def test_init_from_contract_round_trip(tmp_path, monkeypatch):
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        "source_label: test\n"
+        "generated_at: '2026-01-01T00:00:00+00:00'\n"
+        "operations:\n"
+        "  - name: get_order\n"
+        "    source_kind: rest\n"
+        "    method: GET\n"
+        "    path: /orders/{id}\n"
+        "    confidence: high\n"
+        "    error_codes: ['404']\n"
+        "    fields:\n"
+        "      - name: id\n"
+        "        location: path\n"
+        "        type: integer\n"
+        "        required: true\n"
+    )
+
+    out_path = tmp_path / "config.yaml"
+    _cmd_init(_args(from_contract=str(contract_path), out=str(out_path)))
+
+    config = load_config(str(out_path))
+    assert config.adapters[0].type == "rest"
+    rest_settings = config.adapters[0].rest_settings()
+    endpoint = rest_settings.endpoints[0]
+    assert endpoint.name == "get_order"
+    assert endpoint.confidence == "high"
+    assert endpoint.error_codes == ["404"]
+    assert endpoint.write is False

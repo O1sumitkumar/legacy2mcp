@@ -64,6 +64,60 @@ it in production.
 6. **`legacy2mcp init` clones the target repo and parses it with `ast`
    only** -- it never executes any code from the scanned repo.
 
+## `legacy2mcp discover`
+
+1. **No raw sampled or curated value is ever written into a contract.**
+   A Postman collection's saved bearer token, a HAR capture's
+   `Authorization`/`Cookie` header values, any other field value read from
+   a real request/response -- none of it is persisted. Only *inferred*
+   shape (type, required-ness, location) is kept, plus a note when auth was
+   detected (e.g. "source declared bearer auth -- configure
+   RestAdapterSettings.auth yourself"), never the credential itself.
+2. **The one deliberate exception is `enum`**, and it's narrowly gated
+   (`src/legacy2mcp/discovery/redact.py::enum_eligible`): a field's observed
+   values are only ever recorded as an enum if its name doesn't match a
+   sensitive-name pattern (`password`, `secret`, `token`, `api_key`,
+   `ssn`, `credit_card`, ...) **and** there were few enough distinct values
+   to plausibly be a real closed set (≤10). For `--har-file` specifically,
+   there's an additional minimum-sample gate (`_MIN_SAMPLES_FOR_ENUM` in
+   `discovery/har.py`) -- with only 1-2 sampled requests, *every* field
+   trivially has "few distinct values", which doesn't mean anything; a
+   candidate enum is only considered once enough samples have actually
+   repeated a small set of values.
+3. **`--har-file` never reads header values at all**, only header *names*
+   (to produce the auth note) -- so there's no redaction-correctness
+   dependency on legacy2mcp's own sensitive-header list catching every
+   possible secret-carrying header name; the value is simply never looked
+   at in the first place.
+4. **Every HAR-derived operation is unconditionally `confidence="low"` and
+   `needs_review=True`**, regardless of how confident any individual
+   heuristic feels -- it's inferred from whatever traffic happened to be
+   sampled, never treated as a declared contract.
+5. **Stored-procedure introspection connects to the live database** the
+   same way the `db` adapter does (driver imported lazily, DSN read from
+   an environment variable named by `--db-dsn-env`, never written to
+   disk) -- but only to read the procedure/function catalog; no procedure
+   is ever invoked by `discover`.
+6. **`--webpage-url` only ever does one `GET` of the page you give it** --
+   no JavaScript is executed, no link is followed, and no `<form>` it
+   finds is ever submitted. A hidden input's *value* is never persisted
+   (it may be a per-request token such as CSRF, which a static scan can't
+   resolve anyway) -- only its field name, flagged `needs_review`. Like
+   `--rest-url`'s OpenAPI probe, this does fetch a URL you supply, so the
+   same caution that applies to pointing `legacy2mcp` at any live
+   endpoint applies here too.
+
+What it does *not* do yet: path-templating for `--har-file` and
+`--webpage-url` is a simple per-entry heuristic (numeric/UUID-shaped
+segments become a path param) with no cross-sample agreement -- two
+genuinely different endpoints that happen to template to the same path
+get merged into one operation; review the result. `--webpage-url` also
+can't see a form that client-side JavaScript builds or modifies after
+load -- only what's in the page's static HTML. Oracle stored-procedure
+introspection covers standalone procedures/functions only, not ones
+nested inside a package (see
+`adapters/db_dialects.py::OracleDialect.introspect_stored_procedures`).
+
 ## What v0.1 actually does
 
 1. **Every tool call is validated against a JSON Schema before it

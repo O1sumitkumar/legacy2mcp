@@ -142,7 +142,7 @@ def test_duplicate_operation_across_ports_does_not_crash_startup():
 
     app = Legacy2McpApp(config)
     try:
-        names = [tool_def.name for _, tool_def in app._tools.values()]
+        names = [name for name in app._tools if name != "describe_capabilities"]
         assert names == ["calc_Add"]  # exposed once, not once per port
     finally:
         app.close()

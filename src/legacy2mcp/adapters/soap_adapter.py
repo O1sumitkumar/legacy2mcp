@@ -34,33 +34,10 @@ from zeep.transports import Transport
 
 from legacy2mcp.adapters.base import AdapterError, BaseAdapter, ToolDefinition
 from legacy2mcp.config import BasicAuthConfig, SoapAdapterSettings
+from legacy2mcp.discovery.heuristics import looks_like_write as _looks_like_write
 from legacy2mcp.schema.xsd_to_jsonschema import operation_input_schema, operation_output_schema
 
 logger = logging.getLogger("legacy2mcp.soap")
-
-_WRITE_VERB_PREFIXES = (
-    "create",
-    "update",
-    "delete",
-    "remove",
-    "cancel",
-    "void",
-    "submit",
-    "approve",
-    "reject",
-    "insert",
-    "modify",
-    "set",
-    "post",
-    "pay",
-    "charge",
-    "issue",
-)
-
-
-def _looks_like_write(operation_name: str) -> bool:
-    lowered = operation_name.lower()
-    return any(lowered.startswith(v) for v in _WRITE_VERB_PREFIXES)
 
 
 class SoapAdapter(BaseAdapter):

@@ -69,7 +69,7 @@ def test_wsdl_file_loads_directly():
 
 def test_read_operations_exposed_and_writes_hidden_by_default(tmp_path):
     app = _build_app(tmp_path)
-    assert _names(app) == {"orders_GetOrder", "orders_ListOrders", "orders_GetInventory"}
+    assert _names(app) == {"orders_GetOrder", "orders_ListOrders", "orders_GetInventory", "describe_capabilities"}
     app.close()
 
 

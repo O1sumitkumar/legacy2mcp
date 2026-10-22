@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
+### Added
+
+- **`legacy2mcp discover`**: an explicit "figure out what's there before
+  generating a server" step, for sources `init` can't read directly --
+  a Postman Collection (`--postman-file`), a local OpenAPI/Swagger spec
+  file (`--openapi-file`), a database's live stored-procedure/function
+  catalog (`--stored-procs`), a HAR traffic capture (`--har-file` -- from
+  browser devtools, Postman, or mitmproxy's built-in HAR exporter;
+  legacy2mcp never drives a capture proxy itself), a hand-written queue
+  description (`--queue-config`), or a plain webpage with no API docs at
+  all (`--webpage-url` -- fetches the page and turns every `<form>` in its
+  static HTML into a REST operation, one field per input/select/textarea;
+  no JavaScript executed, nothing ever submitted). Writes a Legacy
+  Interface Contract (`contract.yaml`): every operation's inputs, outputs,
+  enums, error codes, read/write side effect, and a confidence level, for
+  human review.
+- **`legacy2mcp init --from-contract`**: turns a reviewed contract into the
+  same `config.yaml` every other `init` path produces. Stored-procedure
+  and queue findings are documented in the contract but skipped (with a
+  clear TODO) when building the runnable config, since no adapter can call
+  either yet.
+- **`describe_capabilities`**: every generated MCP server now exposes one
+  extra, always-on, read-only meta-tool so a connected agent can ask
+  "what can this system do?" (every tool's description, side effect,
+  confidence, required fields, known error codes) before calling anything
+  for real. Built from the live tool list, never a separate file read at
+  serve time, so it can't drift out of sync with what's actually exposed.
+- No raw secret or sampled value is ever persisted into a contract --
+  only inferred shape. The one gated exception (a small, non-sensitive,
+  sufficiently-repeated observed value set becoming an `enum`) is real
+  JSON Schema enforcement when it reaches `config.yaml`, not just
+  description. See [docs/security.md](docs/security.md)'s new
+  `legacy2mcp discover` section for the full redaction policy.
+
 ## [0.2.6] - 2026-10-14
 
 ### Added

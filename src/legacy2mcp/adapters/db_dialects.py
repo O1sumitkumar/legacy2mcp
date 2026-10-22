@@ -37,6 +37,20 @@ class ColumnInfo:
     has_default: bool
 
 
+@dataclass
+class ProcedureParamInfo:
+    name: str
+    sql_type: str
+    mode: str  # "IN" / "OUT" / "INOUT", or "" if the catalog didn't say
+
+
+@dataclass
+class ProcedureInfo:
+    name: str
+    kind: str  # "procedure" | "function"
+    params: list[ProcedureParamInfo]
+
+
 class DbDialect(ABC):
     """One implementation per supported database. Pure SQL-string helpers
     (quote_ident, qualify) live here too since quoting rules are
@@ -52,6 +66,15 @@ class DbDialect(ABC):
 
     @abstractmethod
     def introspect_columns(self, conn: Any, table: str, db_schema: str | None) -> list[ColumnInfo]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def introspect_stored_procedures(self, conn: Any, db_schema: str | None) -> list[ProcedureInfo]:
+        """Live catalog read for `legacy2mcp discover`'s stored-procedure
+        import -- documentation only today: no adapter can *call* a stored
+        procedure yet (see docs/roadmap.md), so this exists purely to
+        capture what's there for a human to review in the generated
+        contract."""
         raise NotImplementedError
 
     @abstractmethod
@@ -74,6 +97,23 @@ class DbDialect(ABC):
             return []
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    def _group_procedure_rows(
+        self, rows: list[tuple], kind_of: Any = lambda routine_type: routine_type
+    ) -> list[ProcedureInfo]:
+        """Shared grouping for the information_schema-style one-row-per-
+        parameter catalog shape (Postgres/SQL Server): rows of
+        (routine_name, routine_type, param_name_or_None, data_type_or_None,
+        param_mode_or_None) ordered by routine name then ordinal position."""
+        procedures: dict[str, ProcedureInfo] = {}
+        for routine_name, routine_type, param_name, data_type, param_mode in rows:
+            proc = procedures.get(routine_name)
+            if proc is None:
+                proc = ProcedureInfo(name=routine_name, kind=kind_of(routine_type), params=[])
+                procedures[routine_name] = proc
+            if param_name is not None:
+                proc.params.append(ProcedureParamInfo(name=param_name, sql_type=data_type or "", mode=param_mode or ""))
+        return list(procedures.values())
 
 
 class PostgresDialect(DbDialect):
@@ -98,6 +138,20 @@ class PostgresDialect(DbDialect):
             ColumnInfo(name=r[0], sql_type=r[1], nullable=(r[2] == "YES"), has_default=r[3] is not None)
             for r in rows
         ]
+
+    def introspect_stored_procedures(self, conn: Any, db_schema: str | None) -> list[ProcedureInfo]:
+        sql = (
+            "SELECT r.routine_name, r.routine_type, p.parameter_name, p.data_type, p.parameter_mode "
+            "FROM information_schema.routines r "
+            "LEFT JOIN information_schema.parameters p "
+            "  ON r.specific_name = p.specific_name AND r.specific_schema = p.specific_schema "
+            "WHERE r.routine_schema = %(schema)s AND r.routine_type IN ('PROCEDURE', 'FUNCTION') "
+            "ORDER BY r.routine_name, p.ordinal_position"
+        )
+        with conn.cursor() as cur:
+            cur.execute(sql, {"schema": db_schema or "public"})
+            rows = cur.fetchall()
+        return self._group_procedure_rows(rows, kind_of=lambda t: "function" if t == "FUNCTION" else "procedure")
 
     def execute_named(self, conn: Any, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         translated = _PARAM_TOKEN.sub(lambda m: f"%({m.group(1)})s", sql)
@@ -130,6 +184,20 @@ class SqlServerDialect(DbDialect):
             ColumnInfo(name=r[0], sql_type=r[1], nullable=(r[2] == "YES"), has_default=r[3] is not None)
             for r in rows
         ]
+
+    def introspect_stored_procedures(self, conn: Any, db_schema: str | None) -> list[ProcedureInfo]:
+        sql = (
+            "SELECT r.routine_name, r.routine_type, p.parameter_name, p.data_type, p.parameter_mode "
+            "FROM information_schema.routines r "
+            "LEFT JOIN information_schema.parameters p "
+            "  ON r.specific_name = p.specific_name AND r.specific_schema = p.specific_schema "
+            "WHERE r.routine_schema = ? AND r.routine_type IN ('PROCEDURE', 'FUNCTION') "
+            "ORDER BY r.routine_name, p.ordinal_position"
+        )
+        cur = conn.cursor()
+        cur.execute(sql, (db_schema or "dbo",))
+        rows = cur.fetchall()
+        return self._group_procedure_rows(rows, kind_of=lambda t: "function" if t == "FUNCTION" else "procedure")
 
     def execute_named(self, conn: Any, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         order: list[str] = []
@@ -179,6 +247,28 @@ class OracleDialect(DbDialect):
             ColumnInfo(name=r[0], sql_type=r[1], nullable=(r[2] == "Y"), has_default=r[3] is not None)
             for r in rows
         ]
+
+    def introspect_stored_procedures(self, conn: Any, db_schema: str | None) -> list[ProcedureInfo]:
+        # Standalone procedures/functions only (ALL_PROCEDURES.PROCEDURE_NAME
+        # IS NULL) -- packaged procedures (PROCEDURE_NAME NOT NULL) share
+        # OBJECT_NAME with their package, which needs a different join to
+        # attribute arguments correctly. Left as a documented gap rather
+        # than risk silently mis-attributing a packaged procedure's args.
+        owner = (db_schema or "").upper()
+        if not owner:
+            raise ValueError("Oracle stored-procedure introspection needs an owner/schema -- pass --db-dialect's schema.")
+        sql = (
+            "SELECT p.object_name, p.object_type, a.argument_name, a.data_type, a.in_out "
+            "FROM all_procedures p "
+            "LEFT JOIN all_arguments a ON a.owner = p.owner AND a.object_name = p.object_name "
+            "WHERE p.owner = :owner AND p.procedure_name IS NULL "
+            "  AND p.object_type IN ('PROCEDURE', 'FUNCTION') "
+            "ORDER BY p.object_name, a.position"
+        )
+        cur = conn.cursor()
+        cur.execute(sql, {"owner": owner})
+        rows = cur.fetchall()
+        return self._group_procedure_rows(rows, kind_of=lambda t: "function" if t == "FUNCTION" else "procedure")
 
     def execute_named(self, conn: Any, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         cur = conn.cursor()

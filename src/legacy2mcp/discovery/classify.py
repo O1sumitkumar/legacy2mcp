@@ -18,18 +18,16 @@ be turned on.
 
 from __future__ import annotations
 
+from legacy2mcp.discovery.contract import ContractError, ContractOperation, LegacyInterfaceContract
+from legacy2mcp.discovery.heuristics import looks_like_write
 from legacy2mcp.discovery.llm import OpenAiLlmClient
 from legacy2mcp.discovery.scan import DbFinding, RouteFinding, ScanResult, SoapFinding
 
-_WRITE_VERB_PREFIXES = (
-    "create", "update", "delete", "remove", "cancel", "void", "submit",
-    "approve", "reject", "insert", "modify", "set", "pay", "charge", "issue",
-)
-
-
-def _looks_like_write(name: str) -> bool:
-    lowered = name.lower()
-    return any(lowered.startswith(v) for v in _WRITE_VERB_PREFIXES)
+# source_kind values that `init --from-contract` can actually turn into a
+# runnable adapter today. db_proc/queue have no runtime adapter yet (see
+# docs/roadmap.md) -- their contract entries are documentation only, and
+# get skipped with an explanatory TODO rather than silently dropped.
+_INVOCABLE_SOURCE_KINDS = {"rest"}
 
 
 def build_config(
@@ -202,7 +200,7 @@ def _rest_config(
         # No LLM available: fall back to the same name-based write heuristic
         # the SOAP adapter already uses, on top of the method-based default.
         for i, route in enumerate(routes):
-            if not write_flags[i] and _looks_like_write(route.name):
+            if not write_flags[i] and looks_like_write(route.name):
                 write_flags[i] = True
 
     endpoints = []
@@ -252,6 +250,116 @@ def _rest_config(
                 "type": "rest",
                 "config": {
                     "base_url": resolved_base_url,
+                    "allow_write_operations": False,
+                    "endpoints": endpoints,
+                },
+            }
+        ],
+        "security": {"audit": {"enabled": True, "path": "./legacy2mcp-audit.log"}},
+    }
+    return config, todos
+
+
+def _endpoint_from_contract_operation(op: ContractOperation, name: str) -> tuple[dict, list[str]]:
+    todos: list[str] = []
+    params = []
+    for field in op.fields:
+        param: dict = {
+            "name": field.name,
+            "location": field.location if field.location != "header" else "query",
+            "type": field.type if field.type in ("string", "integer", "number", "boolean") else "string",
+            "required": field.required,
+        }
+        if field.enum:
+            param["enum"] = field.enum
+        params.append(param)
+        if field.needs_review:
+            todos.append(f"Review field '{field.name}' on '{name}' -- flagged needs_review by the contract.")
+        if field.location == "header":
+            todos.append(f"Field '{field.name}' on '{name}' was a header param -- the rest adapter only supports path/query/body; mapped to query, review before running.")
+        if field.type not in ("string", "integer", "number", "boolean"):
+            todos.append(f"Field '{field.name}' on '{name}' has type '{field.type}', which the rest adapter can't represent -- defaulted to 'string'.")
+
+    method = op.method or "GET"
+    # Trust an explicit "read" (every current importer only ever sets that
+    # when it's actually confident -- a GET with no write-verb name match).
+    # Anything else ("write", or "unknown" from a hand-built/future contract
+    # source) falls back to the same method/name heuristic _rest_config
+    # already uses for a static scan -- erring toward treating it as a
+    # write rather than silently exposing an unreviewed operation as if it
+    # were safely read-only.
+    is_write = op.side_effect == "write" or (
+        op.side_effect != "read" and (method != "GET" or looks_like_write(name))
+    )
+
+    endpoint = {
+        "name": name,
+        "method": method,
+        "path": op.path or "/",
+        "description": op.description,
+        "params": params,
+        "write": is_write,
+        "confidence": op.confidence,
+        "error_codes": op.error_codes,
+        "needs_review": op.needs_review,
+    }
+    if op.needs_review:
+        todos.append(f"Operation '{name}' was flagged needs_review by the contract -- check its notes: {'; '.join(op.notes) or '(none)'}.")
+    return endpoint, todos
+
+
+def build_config_from_contract(contract: LegacyInterfaceContract) -> tuple[dict, list[str]]:
+    """`legacy2mcp init --from-contract`: turn a human-reviewed Legacy
+    Interface Contract (from `legacy2mcp discover`) into a runnable config,
+    the same shape `build_config` produces from a static scan. Only ever
+    builds ONE adapter per run -- a contract whose invocable operations span
+    more than one source_kind needs splitting into separate `discover` runs
+    and separate `init --from-contract` calls, consistent with every other
+    path through this module (SOAP/DB/REST are always one adapter each)."""
+    todos: list[str] = []
+    invocable = [op for op in contract.operations if op.source_kind in _INVOCABLE_SOURCE_KINDS]
+    skipped = [op for op in contract.operations if op.source_kind not in _INVOCABLE_SOURCE_KINDS]
+
+    for op in skipped:
+        reason = "; ".join(op.notes) or "no runtime adapter yet"
+        todos.append(f"Skipped '{op.name}' ({op.source_kind}): {reason}.")
+
+    kinds_present = {op.source_kind for op in invocable}
+    if len(kinds_present) > 1:
+        raise ContractError(
+            f"This contract mixes invocable source kinds {sorted(kinds_present)} -- "
+            f"`init --from-contract` builds one adapter per run. Split the contract "
+            f"(or re-run `discover` separately per source) and convert each on its own."
+        )
+    if not invocable:
+        raise ContractError(
+            "This contract has no operations `init --from-contract` can turn into a runnable "
+            "tool yet (db_proc/queue have no runtime adapter -- see docs/roadmap.md)."
+        )
+
+    names = _dedupe_names(invocable)
+    endpoints = []
+    for i, op in enumerate(invocable):
+        endpoint, op_todos = _endpoint_from_contract_operation(op, names[i])
+        endpoints.append(endpoint)
+        todos.extend(op_todos)
+
+    write_count = sum(1 for e in endpoints if e["write"])
+    if write_count:
+        todos.append(
+            f"{write_count} endpoint(s) were classified as write operations and stay hidden "
+            f"unless you set allow_write_operations: true. Review the 'write' flags above."
+        )
+    todos.append("Set adapters[0].config.base_url to where this API is actually deployed/running.")
+
+    config = {
+        "server": {"name": "legacy-mcp"},
+        "adapters": [
+            {
+                "id": "legacy",
+                "type": "rest",
+                "config": {
+                    "base_url": "REPLACE_ME_BASE_URL",
                     "allow_write_operations": False,
                     "endpoints": endpoints,
                 },

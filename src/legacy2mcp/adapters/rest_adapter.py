@@ -61,8 +61,16 @@ class RestAdapter(BaseAdapter):
     def _endpoint_tool(self, endpoint: RestEndpointSettings) -> ToolDefinition:
         properties: dict[str, Any] = {}
         required: list[str] = []
+        param_enums: dict[str, list[str]] = {}
         for param in endpoint.params:
-            properties[param.name] = dict(_PARAM_TYPE_TO_JSONSCHEMA[param.type])
+            schema = dict(_PARAM_TYPE_TO_JSONSCHEMA[param.type])
+            if param.enum:
+                # Real enforcement via security/validation.py, not just a
+                # description -- an out-of-range value is rejected before
+                # it ever reaches the backend.
+                schema["enum"] = param.enum
+                param_enums[param.name] = param.enum
+            properties[param.name] = schema
             if param.required or param.location == "path":
                 required.append(param.name)
 
@@ -84,6 +92,10 @@ class RestAdapter(BaseAdapter):
                 "rest_method": endpoint.method,
                 "rest_path": endpoint.path,
                 "write": endpoint.write,
+                "side_effect": "write" if endpoint.write else "read",
+                "confidence": endpoint.confidence,
+                "error_codes": endpoint.error_codes,
+                "param_enums": param_enums,
             },
         )
 

@@ -135,6 +135,12 @@ class RestParamSettings(BaseModel):
     location: Literal["path", "query", "body"] = "query"
     type: Literal["string", "integer", "number", "boolean"] = "string"
     required: bool = True
+    # A closed set of values this param can take, when known (e.g. from an
+    # OpenAPI spec's `enum` or a narrow set of observed values) -- enforced
+    # by security/validation.py, not just descriptive. Comes from
+    # `legacy2mcp discover` + `init --from-contract`; hand-written configs
+    # leave it unset.
+    enum: list[str] | None = None
 
 
 class RestEndpointSettings(BaseModel):
@@ -152,6 +158,15 @@ class RestEndpointSettings(BaseModel):
     # Non-GET endpoints also require allow_write_operations, same posture as
     # the SOAP/DB adapters' write gating.
     write: bool = False
+    # The following three are only ever populated by `legacy2mcp discover` +
+    # `init --from-contract` (a Postman collection, a local OpenAPI file, a
+    # HAR capture) -- how much to trust this finding, what error responses
+    # are known, and whether a human should look at it before relying on it.
+    # Left unset by the plain scan/OpenAPI-URL path, which has no concept of
+    # "confidence" beyond its existing needs_review-per-param flagging.
+    confidence: Literal["high", "medium", "low"] | None = None
+    error_codes: list[str] = Field(default_factory=list)
+    needs_review: bool = False
 
 
 class RestAdapterSettings(BaseModel):

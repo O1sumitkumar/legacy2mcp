@@ -10,8 +10,11 @@ of which path fed it.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
+from legacy2mcp.discovery.contract import ContractError, ContractField, ContractOperation, LegacyInterfaceContract
+from legacy2mcp.discovery.heuristics import looks_like_write
 from legacy2mcp.discovery.scan import RouteFinding, RouteParam
 
 _CANDIDATE_PATHS = ("/openapi.json", "/swagger.json", "/v1/openapi.json", "/api/openapi.json")
@@ -130,3 +133,118 @@ def discover(base_url: str, timeout: float = 10.0) -> list[RouteFinding]:
             return _routes_from_spec(spec)
 
     raise OpenApiError(f"No OpenAPI/Swagger spec found at {base} (tried {', '.join(_CANDIDATE_PATHS)}).")
+
+
+def load_spec_from_file(path: str) -> dict:
+    """Load a local OpenAPI/Swagger spec file -- JSON or YAML, by extension.
+    Used by `legacy2mcp discover --openapi-file`, for a spec that isn't
+    served at a live URL (checked into a repo, handed over as a file, ...)."""
+    import yaml
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError as exc:
+        raise ContractError(f"Could not read OpenAPI spec '{path}': {exc}") from exc
+
+    try:
+        spec = yaml.safe_load(text)  # YAML is a superset of JSON -- one parser handles both extensions
+    except yaml.YAMLError as exc:
+        raise ContractError(f"'{path}' is not valid JSON/YAML: {exc}") from exc
+
+    if not isinstance(spec, dict) or "paths" not in spec:
+        raise ContractError(f"'{path}' doesn't look like an OpenAPI/Swagger spec (no top-level 'paths').")
+    return spec
+
+
+def _field_enum(spec: dict, schema: dict | None) -> list[str] | None:
+    resolved = _resolve_ref(spec, schema)
+    enum = resolved.get("enum")
+    if isinstance(enum, list) and enum and all(isinstance(v, (str, int, float, bool)) for v in enum):
+        return [str(v) for v in enum]
+    return None
+
+
+def _error_codes(operation: dict) -> list[str]:
+    codes = []
+    for status in (operation.get("responses") or {}):
+        status_str = str(status)
+        if status_str[:1] in ("4", "5"):
+            codes.append(status_str)
+    return sorted(codes)
+
+
+def contract_from_spec(spec: dict, source_label: str) -> LegacyInterfaceContract:
+    """Build a Legacy Interface Contract directly from a parsed OpenAPI/
+    Swagger spec -- a declared spec is as trustworthy as a live WSDL
+    (confidence="high"), so this captures the extra detail a spec can carry
+    that a plain RouteFinding can't: enums and declared error responses."""
+    operations: list[ContractOperation] = []
+
+    for path, methods in (spec.get("paths") or {}).items():
+        if not isinstance(methods, dict):
+            continue
+        for method, operation in methods.items():
+            if method.lower() not in _HTTP_METHODS or not isinstance(operation, dict):
+                continue
+
+            fields: list[ContractField] = []
+            for param in operation.get("parameters", []):
+                location = param.get("in")
+                if location not in {"path", "query"}:
+                    continue
+                schema = _resolve_ref(spec, param.get("schema"))
+                param_type, needs_review = _param_type(schema)
+                fields.append(
+                    ContractField(
+                        name=param["name"],
+                        location=location,
+                        type=param_type,
+                        required=bool(param.get("required", location == "path")),
+                        enum=_field_enum(spec, param.get("schema")),
+                        confidence="high",
+                        needs_review=needs_review,
+                        description=(param.get("description") or "").strip(),
+                    )
+                )
+
+            body_schema = _resolve_ref(
+                spec, operation.get("requestBody", {}).get("content", {}).get("application/json", {}).get("schema", {})
+            )
+            required_body = set(body_schema.get("required") or [])
+            for field_name, field_schema in (body_schema.get("properties") or {}).items():
+                resolved_field = _resolve_ref(spec, field_schema)
+                param_type, needs_review = _param_type(resolved_field)
+                fields.append(
+                    ContractField(
+                        name=field_name,
+                        location="body",
+                        type=param_type,
+                        required=field_name in required_body,
+                        enum=_field_enum(spec, field_schema),
+                        confidence="high",
+                        needs_review=needs_review,
+                        description=(resolved_field.get("description") or "").strip(),
+                    )
+                )
+
+            name = _operation_name(operation, method.lower(), path)
+            operations.append(
+                ContractOperation(
+                    name=name,
+                    source_kind="rest",
+                    method=method.upper(),
+                    path=path,
+                    description=(operation.get("summary") or "").strip(),
+                    side_effect="write" if (method.lower() != "get" or looks_like_write(name)) else "read",
+                    fields=fields,
+                    error_codes=_error_codes(operation),
+                    confidence="high",
+                )
+            )
+
+    return LegacyInterfaceContract(
+        source_label=source_label,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        operations=operations,
+    )

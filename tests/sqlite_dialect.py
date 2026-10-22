@@ -15,7 +15,7 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from legacy2mcp.adapters.db_dialects import ColumnInfo, DbDialect
+from legacy2mcp.adapters.db_dialects import ColumnInfo, DbDialect, ProcedureInfo
 
 
 class SqliteTestDialect(DbDialect):
@@ -33,6 +33,9 @@ class SqliteTestDialect(DbDialect):
             ColumnInfo(name=r[1], sql_type=r[2], nullable=(r[3] == 0), has_default=r[4] is not None)
             for r in rows
         ]
+
+    def introspect_stored_procedures(self, conn: Any, db_schema: str | None) -> list[ProcedureInfo]:
+        return []  # sqlite has no stored procedures; not exercised by test_db_adapter.py
 
     def execute_named(self, conn: Any, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         cur = conn.execute(sql, params)

@@ -49,7 +49,7 @@ def _build_app(tmp_path, allow_write_operations: bool = False, exclude=None, inc
 def test_discovers_all_calculator_operations(tmp_path):
     app = _build_app(tmp_path)
     names = {tool_def.name for _, tool_def in app._tools.values()}
-    assert names == {"calc_Add", "calc_Subtract", "calc_Multiply", "calc_Divide"}
+    assert names == {"calc_Add", "calc_Subtract", "calc_Multiply", "calc_Divide", "describe_capabilities"}
     app.close()
 
 
@@ -124,7 +124,7 @@ def test_exclude_operations_filters_tool_out(tmp_path):
 def test_include_operations_allowlist(tmp_path):
     app = _build_app(tmp_path, include=["Add"])
     names = {tool_def.name for _, tool_def in app._tools.values()}
-    assert names == {"calc_Add"}
+    assert names == {"calc_Add", "describe_capabilities"}
     app.close()
 
 

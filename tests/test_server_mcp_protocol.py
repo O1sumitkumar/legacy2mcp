@@ -12,6 +12,7 @@ constructor-registered handlers' actual call signature or return shape.
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 import time
 
@@ -80,9 +81,9 @@ async def test_real_client_session_lists_and_calls_tools_through_the_sdk():
                     await session.initialize()
 
                     tools_result = await session.list_tools()
-                    names = {t.name for t in tools_result.tools}
-                    assert names == {"legacy_get_order"}
-                    assert tools_result.tools[0].input_schema["properties"]["order_id"]["type"] == "integer"
+                    tools_by_name = {t.name: t for t in tools_result.tools}
+                    assert set(tools_by_name) == {"legacy_get_order", "describe_capabilities"}
+                    assert tools_by_name["legacy_get_order"].input_schema["properties"]["order_id"]["type"] == "integer"
 
                     call_result = await session.call_tool("legacy_get_order", {"order_id": 1})
                     assert call_result.is_error is not True
@@ -92,6 +93,16 @@ async def test_real_client_session_lists_and_calls_tools_through_the_sdk():
                     # Unknown tool -> a real error *result*, not a crashed connection.
                     error_result = await session.call_tool("legacy_does_not_exist", {})
                     assert error_result.is_error is True
+
+                    # describe_capabilities survives the real SDK dispatch path too,
+                    # not just a direct _dispatch() call -- this is the one place
+                    # that actually proves it.
+                    caps_result = await session.call_tool("describe_capabilities", {})
+                    assert caps_result.is_error is not True
+                    caps = json.loads(caps_result.content[0].text)
+                    assert caps["tool_count"] == 1
+                    assert caps["tools"][0]["name"] == "legacy_get_order"
+                    assert caps["tools"][0]["side_effect"] == "read"
             finally:
                 server_task.cancel()
                 try:

@@ -62,10 +62,49 @@
   [docs/security.md](security.md) for what this heuristic does and doesn't
   guarantee.
 
+## v0.2.x -- Discover mode
+
+- **`legacy2mcp discover`** -- ✅ shipped: an explicit upstream step before
+  `init`, for sources it can't read directly -- a Postman Collection
+  (`--postman-file`), a local OpenAPI/Swagger spec file (`--openapi-file`),
+  a database's live stored-procedure/function catalog (`--stored-procs`),
+  a HAR traffic capture (`--har-file` -- from browser devtools, Postman's
+  own capture, or mitmproxy's built-in `mitmdump --set hardump=out.har`
+  exporter; legacy2mcp never drives a capture proxy itself), a small
+  hand-written queue description (`--queue-config`), or a plain webpage
+  with no API docs at all (`--webpage-url` -- fetches the page and turns
+  every `<form>` in its static HTML into a REST operation; no JavaScript
+  executed, nothing ever submitted). Writes a Legacy
+  Interface Contract (`contract.yaml`): every operation's inputs, outputs,
+  enums, error codes, read/write side effect, and a confidence level (how
+  the finding was made -- a live catalog vs. a curated artifact vs.
+  inferred from sampled traffic), for a human to review before anything
+  becomes runnable.
+- **`legacy2mcp init --from-contract`** -- ✅ shipped: turns a reviewed
+  contract into the same `config.yaml` the other `init` paths produce.
+  Only REST-shaped operations are runnable today -- stored-procedure and
+  queue findings are still captured in the contract for documentation, but
+  get skipped with an explanatory TODO rather than silently dropped, since
+  no adapter can call them yet (see Queue adapter and stored-procedure
+  support below).
+- **`describe_capabilities`** -- ✅ shipped: every generated MCP server now
+  exposes one extra, always-on, read-only meta-tool so a connected agent
+  can ask "what can this system do?" (every other tool's description,
+  side effect, confidence, required fields, known error codes) before
+  calling anything for real.
+
 ## v0.3+ (ideas, unscheduled)
 
 - **Queue adapter** (`type: queue`): publish/subscribe tools for
-  Kafka, RabbitMQ, SQS.
+  Kafka, RabbitMQ, SQS. `legacy2mcp discover --queue-config` already
+  captures queue descriptions into a contract today; this is the
+  still-missing runtime half that would let `init --from-contract` turn
+  one into an actual tool.
+- **Stored-procedure calling** (`type: db`, extended): `legacy2mcp
+  discover --stored-procs` already reads a live procedure/function catalog
+  into a contract; calling one at runtime -- with the same named,
+  parameterized-only posture the `db` adapter already uses for tables and
+  queries -- is still future work.
 - Multi-step workflow composition with human-in-the-loop approval
   gates (chain several tools into one guarded operation).
 - OpenTelemetry tracing export (spans per tool call) alongside the

@@ -27,6 +27,7 @@ from legacy2mcp.adapters.base import AdapterError, BaseAdapter, ToolDefinition
 from legacy2mcp.adapters.db_adapter import DbAdapter
 from legacy2mcp.adapters.rest_adapter import RestAdapter
 from legacy2mcp.adapters.soap_adapter import SoapAdapter
+from legacy2mcp.capabilities import build_describe_capabilities_entry
 from legacy2mcp.config import AdapterConfig, Legacy2McpConfig
 from legacy2mcp.security.audit import AuditLogger
 from legacy2mcp.security.validation import ValidationError, validate_arguments
@@ -63,6 +64,7 @@ class Legacy2McpApp:
         self._tools: dict[str, tuple[BaseAdapter, ToolDefinition]] = {}
 
         self._load_adapters()
+        self._register_capabilities_tool()
 
         # Bound methods, not closures defined after construction -- mcp>=2.0
         # wires on_list_tools/on_call_tool in via the constructor rather than
@@ -97,6 +99,19 @@ class Legacy2McpApp:
                 adapter_config.type,
                 len(tool_defs),
             )
+
+    def _register_capabilities_tool(self) -> None:
+        """`describe_capabilities`: always on, read-only, no side effects --
+        unlike every other toggle in this codebase (which all gate
+        something with a real consequence: write access, audit logging),
+        there's no meaningful "off" state worth a config flag for this."""
+        adapter, tool_def = build_describe_capabilities_entry(self._tools)
+        if tool_def.name in self._tools:
+            raise ValueError(
+                f"An adapter already produced a tool literally named '{tool_def.name}' -- rename it."
+            )
+        self._adapters[adapter.adapter_id] = adapter
+        self._tools[tool_def.name] = (adapter, tool_def)
 
         if not self._tools:
             logger.warning(
