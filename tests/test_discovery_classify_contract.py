@@ -99,6 +99,28 @@ def test_explicit_read_side_effect_is_trusted_even_for_non_get():
     assert config["adapters"][0]["config"]["endpoints"][0]["write"] is False
 
 
+def test_base_url_defaults_to_replace_me_for_a_non_url_source():
+    contract = _contract(ContractOperation(name="get_order", source_kind="rest", method="GET", path="/orders"))
+    config, todos = build_config_from_contract(contract)
+    assert config["adapters"][0]["config"]["base_url"] == "REPLACE_ME_BASE_URL"
+    assert any("base_url" in t for t in todos)
+
+
+def test_base_url_is_derived_from_a_url_source_label():
+    # discovery/webpage.py's source_label is always the live URL it
+    # fetched -- that host is already known, so init --from-contract
+    # shouldn't leave a REPLACE_ME placeholder (or the TODO for it) when
+    # it doesn't have to.
+    contract = LegacyInterfaceContract(
+        source_label="https://example.com/some/page",
+        generated_at="2026-01-01T00:00:00+00:00",
+        operations=[ContractOperation(name="get_home", source_kind="rest", method="GET", path="/")],
+    )
+    config, todos = build_config_from_contract(contract)
+    assert config["adapters"][0]["config"]["base_url"] == "https://example.com"
+    assert not any("base_url" in t for t in todos)
+
+
 def test_enum_and_confidence_survive_into_config():
     contract = _contract(
         ContractOperation(

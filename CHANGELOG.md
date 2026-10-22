@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-21
+
+### Fixed
+
+- **`init --from-contract` now fills in `base_url` automatically for a
+  webpage-sourced contract.** A contract from `discover --webpage-url`
+  already carries the live URL it fetched as its `source_label` -- that
+  host is the real `base_url`, so there's no reason to leave
+  `REPLACE_ME_BASE_URL` for a human to fill in by hand. Every other
+  `discover` source (a local file, a database) is unaffected -- they
+  still leave the placeholder, since there's no live host to infer it
+  from. Practical effect: the generated config is immediately runnable,
+  so `legacy2mcp init`'s no-API-key test-chat page now opens right away
+  for a webpage-discovered server instead of requiring a manual edit
+  first.
+
 ## [0.3.1] - 2026-10-21
 
 ### Changed

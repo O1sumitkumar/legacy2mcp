@@ -410,7 +410,13 @@ A few things worth knowing:
   HTML forms normally POST as `application/x-www-form-urlencoded`, but
   the REST adapter always sends a JSON body, so every non-GET form gets
   a note to double-check that the backend actually accepts JSON before
-  you rely on it.
+  you rely on it. Unlike every other `discover` source, legacy2mcp
+  already knows the real `base_url` here (it's the host it just
+  fetched) -- so `init --from-contract` on a webpage-sourced contract
+  fills that in automatically instead of leaving `REPLACE_ME_BASE_URL`,
+  and the no-API-key test-chat page (see [Quick
+  start](#quick-start)) opens right away with real example questions
+  for whatever your site turned into tools.
 - **Stored procedures and queue descriptions are documented, not runnable
   yet.** `--stored-procs` and `--queue-config` still produce real contract
   entries -- there's no adapter to actually *call* either today (see

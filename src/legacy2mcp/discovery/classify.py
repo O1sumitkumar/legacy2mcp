@@ -18,6 +18,8 @@ be turned on.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from legacy2mcp.discovery.contract import ContractError, ContractOperation, LegacyInterfaceContract
 from legacy2mcp.discovery.heuristics import looks_like_write
 from legacy2mcp.discovery.llm import OpenAiLlmClient
@@ -308,6 +310,20 @@ def _endpoint_from_contract_operation(op: ContractOperation, name: str) -> tuple
     return endpoint, todos
 
 
+def _base_url_from_source_label(source_label: str) -> str | None:
+    """`discovery/webpage.py` is the one importer whose `source_label` is
+    always the live URL it fetched (every other importer's source_label
+    is a local file path, or e.g. "postgres database") -- when it is a
+    real http(s) URL, the host that served the page is also the host its
+    forms/links resolve against, so there's no REPLACE_ME_BASE_URL to
+    fill in by hand: `init --from-contract` already knows where this API
+    actually lives."""
+    parts = urlsplit(source_label)
+    if parts.scheme in ("http", "https") and parts.netloc:
+        return f"{parts.scheme}://{parts.netloc}"
+    return None
+
+
 def build_config_from_contract(contract: LegacyInterfaceContract) -> tuple[dict, list[str]]:
     """`legacy2mcp init --from-contract`: turn a human-reviewed Legacy
     Interface Contract (from `legacy2mcp discover`) into a runnable config,
@@ -350,7 +366,11 @@ def build_config_from_contract(contract: LegacyInterfaceContract) -> tuple[dict,
             f"{write_count} endpoint(s) were classified as write operations and stay hidden "
             f"unless you set allow_write_operations: true. Review the 'write' flags above."
         )
-    todos.append("Set adapters[0].config.base_url to where this API is actually deployed/running.")
+
+    resolved_base_url = _base_url_from_source_label(contract.source_label)
+    if resolved_base_url is None:
+        resolved_base_url = "REPLACE_ME_BASE_URL"
+        todos.append("Set adapters[0].config.base_url to where this API is actually deployed/running.")
 
     config = {
         "server": {"name": "legacy-mcp"},
@@ -359,7 +379,7 @@ def build_config_from_contract(contract: LegacyInterfaceContract) -> tuple[dict,
                 "id": "legacy",
                 "type": "rest",
                 "config": {
-                    "base_url": "REPLACE_ME_BASE_URL",
+                    "base_url": resolved_base_url,
                     "allow_write_operations": False,
                     "endpoints": endpoints,
                 },
