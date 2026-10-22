@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from legacy2mcp import webui
-from legacy2mcp.config import load_config
+from legacy2mcp.config import Legacy2McpConfig, load_config
 from legacy2mcp.discovery import classify, generate, har, openapi, postman, queue_contract, repo, report, scan, storedproc, webpage
 from legacy2mcp.discovery.contract import ContractError, load_contract
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
@@ -112,7 +112,10 @@ def _cmd_discover(args: argparse.Namespace) -> None:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    text = generate.render_contract_yaml(contract, source_label)
+    if Path(args.out).suffix.lower() in (".html", ".htm"):
+        text = generate.render_contract_html(contract, source_label)
+    else:
+        text = generate.render_contract_yaml(contract, source_label)
     out_path = generate.write_config(args.out, text)
 
     by_confidence: dict[str, int] = {}
@@ -129,6 +132,51 @@ def _cmd_discover(args: argparse.Namespace) -> None:
         file=sys.stderr,
     )
     print(f"Next: legacy2mcp init --from-contract {out_path} --out config.yaml", file=sys.stderr)
+    print(f"  or: legacy2mcp demo --from-contract {out_path}  (try it in a chat page right away)", file=sys.stderr)
+
+
+def _cmd_demo(args: argparse.Namespace) -> None:
+    """Start the same no-API-key test-chat server `init` can auto-launch,
+    straight from a contract (skipping a separate `init --from-contract`
+    step) or an existing config -- and save a standalone chat.html that
+    points at it, for `--from-contract`/`--config` sources that weren't
+    already interactive `init` run. The server has to keep running for
+    that saved page to work (this command blocks until Ctrl+C) -- it's a
+    thin client page with its own backend of zero, not an offline file;
+    see webui.render_page()'s docstring for why (CORS, and because the
+    real HTTP call has to be made by something other than the page
+    itself, same as the browser's same-origin `/` route already does)."""
+    try:
+        if args.from_contract:
+            contract = load_contract(args.from_contract)
+            config_dict, _todos = classify.build_config_from_contract(contract)
+            app_config = Legacy2McpConfig.model_validate(config_dict)
+        else:
+            app_config = load_config(args.config)
+    except ContractError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    app = Legacy2McpApp(app_config)
+    try:
+        server = webui.start_server(app, host=args.host, port=args.port)
+    except OSError as exc:
+        print(f"error: couldn't bind {args.host}:{args.port} ({exc}). Try a different --port.", file=sys.stderr)
+        app.close()
+        sys.exit(1)
+
+    base_url = f"http://{server.server_address[0]}:{server.server_address[1]}"
+    out_path = generate.write_config(args.out, webui.render_page(base_url))
+    print(f"Wrote {out_path} -- a standalone chat page pointing at {base_url}.", file=sys.stderr)
+    print("This command has to keep running for that page to work (Ctrl+C to stop).", file=sys.stderr)
+
+    if not args.no_open:
+        webui.open_browser(out_path.resolve().as_uri())
+
+    try:
+        webui.serve_until_interrupted(server)
+    finally:
+        app.close()
 
 
 def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, str]:
@@ -427,8 +475,34 @@ def main() -> None:
             "Repeatable. --har-file only."
         ),
     )
-    discover_parser.add_argument("--out", default="./contract.yaml", help="Where to write the generated contract.")
+    discover_parser.add_argument(
+        "--out",
+        default="./contract.yaml",
+        help=(
+            "Where to write the generated contract. A '.yaml'/'.yml' path writes the plain "
+            "contract; a '.html'/'.htm' path writes a human-readable report with the same "
+            "contract embedded in it, so it works as --from-contract input too."
+        ),
+    )
     discover_parser.set_defaults(func=_cmd_discover)
+
+    demo_parser = subparsers.add_parser(
+        "demo",
+        help=(
+            "Start the same no-API-key test-chat server `init` can auto-launch, directly from "
+            "a contract or an existing config, and save a standalone chat.html pointing at it."
+        ),
+    )
+    demo_source_group = demo_parser.add_mutually_exclusive_group(required=True)
+    demo_source_group.add_argument(
+        "--from-contract", help="A contract.yaml or contract.html written by `legacy2mcp discover`."
+    )
+    demo_source_group.add_argument("--config", help="An existing config.yaml to serve directly.")
+    demo_parser.add_argument("--out", default="./chat.html", help="Where to save the standalone chat page.")
+    demo_parser.add_argument("--host", default="127.0.0.1", help="Host to bind the local server to.")
+    demo_parser.add_argument("--port", type=int, default=8787, help="Port to bind the local server to.")
+    demo_parser.add_argument("--no-open", action="store_true", help="Don't open chat.html in a browser automatically.")
+    demo_parser.set_defaults(func=_cmd_demo)
 
     init_parser = subparsers.add_parser(
         "init",

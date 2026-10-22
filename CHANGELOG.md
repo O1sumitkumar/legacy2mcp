@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-22
+
+### Added
+
+- **`legacy2mcp demo`**: starts the same no-API-key test-chat server
+  `init` can auto-launch, directly from a `--from-contract` contract or
+  an existing `--config`, and saves a standalone `chat.html` pointing at
+  it (opened automatically unless `--no-open`). The server still has to
+  keep running (`Ctrl+C` to stop) for that page's `fetch()` calls to
+  work -- it's a thin client page with no backend of its own, same
+  reason `webui.py`'s existing same-origin page needed a server too; see
+  `webui.render_page()`'s docstring. The server now also sends
+  `Access-Control-Allow-Origin: *` on its JSON endpoints, since a saved
+  `chat.html` opened as a `file://...` page is a different origin than
+  the server and the browser enforces CORS even for localhost.
+- **`legacy2mcp discover --out contract.html`**: writes a human-readable
+  HTML report of the discovered contract instead of plain YAML (pick it
+  by the `.html`/`.htm` extension on `--out`). It's still a valid
+  `--from-contract`/`demo --from-contract` input, not just something to
+  read -- the full contract is embedded in the page as JSON (escaped so
+  a literal `</script>` inside any field value, e.g. a crawled page's
+  text, can't be mistaken for the real closing tag).
+
 ## [0.3.2] - 2026-10-21
 
 ### Fixed

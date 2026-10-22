@@ -4,7 +4,8 @@ import yaml
 
 from legacy2mcp.config import Legacy2McpConfig
 from legacy2mcp.discovery.classify import build_config
-from legacy2mcp.discovery.generate import render_yaml
+from legacy2mcp.discovery.contract import ContractField, ContractOperation, LegacyInterfaceContract
+from legacy2mcp.discovery.generate import render_contract_html, render_yaml
 from legacy2mcp.discovery.scan import DbFinding, DbTableFinding, RouteFinding, RouteParam, ScanResult, SoapFinding
 
 
@@ -74,3 +75,31 @@ def test_render_yaml_is_valid_yaml_with_header_comment():
     assert "TODO" in text
     parsed = yaml.safe_load(text)
     assert parsed == config
+
+
+def test_render_contract_html_shows_operations_and_embeds_the_contract():
+    contract = LegacyInterfaceContract(
+        source_label="https://example.com/",
+        generated_at="2026-01-01T00:00:00+00:00",
+        operations=[
+            ContractOperation(
+                name="get_home",
+                source_kind="rest",
+                method="GET",
+                path="/",
+                side_effect="read",
+                confidence="low",
+                needs_review=True,
+                fields=[ContractField(name="q", location="query", type="string")],
+            )
+        ],
+    )
+    html = render_contract_html(contract, contract.source_label)
+
+    assert "get_home" in html
+    assert "needs review" in html
+    assert 'id="legacy2mcp-contract"' in html
+    # The embedded JSON is what makes this file a valid --from-contract
+    # input too, not just a human-readable report -- contract.py's own
+    # test suite exercises the round trip itself.
+    assert '"name":"get_home"' in html

@@ -23,10 +23,21 @@ comments today.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
+
+# The id of the <script type="application/json"> element discovery/generate.py's
+# render_contract_html() embeds the full contract into, so a contract.html
+# report is round-trippable back into a LegacyInterfaceContract -- not just
+# a human-readable summary. Shared here (rather than duplicated in
+# generate.py) since both the embedder and this loader have to agree on it.
+CONTRACT_HTML_ELEMENT_ID = "legacy2mcp-contract"
+_HTML_CONTRACT_RE = re.compile(
+    rf'<script[^>]*id="{CONTRACT_HTML_ELEMENT_ID}"[^>]*>(.*?)</script>', re.DOTALL
+)
 
 
 class ContractError(Exception):
@@ -76,11 +87,31 @@ class LegacyInterfaceContract(BaseModel):
 
 
 def load_contract(path: str) -> LegacyInterfaceContract:
+    """Loads a contract.yaml, or a contract.html written by `legacy2mcp
+    discover --out contract.html` -- the HTML report is also a valid
+    round-trip source, not just a human-readable summary, since
+    generate.py's render_contract_html() embeds the full contract as JSON
+    alongside the readable table."""
     try:
         with open(path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f) or {}
+            text = f.read()
     except OSError as exc:
         raise ContractError(f"Could not read contract file '{path}': {exc}") from exc
+
+    if path.lower().endswith((".html", ".htm")):
+        match = _HTML_CONTRACT_RE.search(text)
+        if not match:
+            raise ContractError(
+                f"'{path}' doesn't look like a contract.html written by `legacy2mcp discover` "
+                f"(no embedded contract data found)."
+            )
+        try:
+            return LegacyInterfaceContract.model_validate_json(match.group(1))
+        except Exception as exc:  # pydantic.ValidationError -- report, don't swallow
+            raise ContractError(f"'{path}' has corrupted embedded contract data: {exc}") from exc
+
+    try:
+        raw = yaml.safe_load(text) or {}
     except yaml.YAMLError as exc:
         raise ContractError(f"'{path}' is not valid YAML: {exc}") from exc
 

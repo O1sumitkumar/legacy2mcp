@@ -377,6 +377,19 @@ notes on anything uncertain. Review it like you'd review `config.yaml`'s
 legacy2mcp init --from-contract contract.yaml --out config.yaml
 ```
 
+Or skip straight to trying it, no `config.yaml` step needed:
+
+```bash
+legacy2mcp demo --from-contract contract.yaml
+```
+
+That starts the same no-API-key test-chat server `init` can auto-launch, and
+saves a standalone `chat.html` pointing at it -- opened automatically unless
+you pass `--no-open`. The command has to keep running (`Ctrl+C` to stop) for
+that page to work; it's a thin client page with no backend of its own, so
+the real HTTP calls still have to be made by *something*, same reason the
+browser can't just open a config file and call a REST API directly.
+
 A few things worth knowing:
 
 - **No raw secret is ever written into a contract.** A Postman collection's
@@ -426,6 +439,11 @@ A few things worth knowing:
   free -- a connected agent can call it to ask "what can this system do?"
   (every tool's description, side effect, confidence, required fields,
   known error codes) before calling anything for real.
+- **`--out contract.html`** writes a human-readable report instead of the
+  plain YAML -- the same operations, as a table, in your browser. It's
+  still a valid `--from-contract`/`demo --from-contract` input: the full
+  contract is embedded in the page (in a `<script type="application/json">`
+  tag), not just summarized for reading.
 
 ## Teach your AI coding agent about legacy2mcp
 

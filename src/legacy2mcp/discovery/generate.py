@@ -7,12 +7,13 @@ rather than trying to splice comments into the YAML tree.
 
 from __future__ import annotations
 
+import html
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
-from legacy2mcp.discovery.contract import LegacyInterfaceContract
+from legacy2mcp.discovery.contract import CONTRACT_HTML_ELEMENT_ID, LegacyInterfaceContract
 
 
 def render_yaml(config: dict, source_label: str, todos: list[str]) -> str:
@@ -65,6 +66,129 @@ def render_contract_yaml(contract: LegacyInterfaceContract, source_label: str) -
     ]
     body = yaml.safe_dump(contract.model_dump(), sort_keys=False, default_flow_style=False)
     return "\n".join(lines) + body
+
+
+def _esc(value: object) -> str:
+    return html.escape(str(value))
+
+
+def _contract_field_li(field) -> str:
+    bits = [f"<code>{_esc(field.name)}</code>", _esc(field.type), _esc(field.location)]
+    bits.append("required" if field.required else "optional")
+    if field.enum:
+        bits.append("enum: " + ", ".join(_esc(v) for v in field.enum))
+    extra = f' <span class="note">{_esc(field.description)}</span>' if field.description else ""
+    return f"<li>{' &middot; '.join(bits)}{extra}</li>"
+
+
+def _contract_operation_row(op) -> str:
+    kind = "Changes data" if op.side_effect == "write" else ("Read-only" if op.side_effect == "read" else "Unknown effect")
+    kind_class = "write" if op.side_effect == "write" else ("read" if op.side_effect == "read" else "unknown")
+    method_path = f"{_esc(op.method)} {_esc(op.path)}" if op.method else _esc(op.db_object or op.queue_name or "")
+    fields_html = "<ul>" + "".join(_contract_field_li(f) for f in op.fields) + "</ul>" if op.fields else "<em>No fields.</em>"
+    notes_html = "<ul>" + "".join(f"<li>{_esc(n)}</li>" for n in op.notes) + "</ul>" if op.notes else ""
+    review_badge = ' <span class="badge needs-review">needs review</span>' if op.needs_review else ""
+    return (
+        "<tr>"
+        f"<td><code>{_esc(op.name)}</code>{review_badge}<br><span class=\"muted\">{_esc(op.source_kind)}</span></td>"
+        f"<td><span class=\"badge {kind_class}\">{kind}</span><br><span class=\"muted\">{method_path}</span></td>"
+        f"<td>{_esc(op.confidence)}</td>"
+        f"<td>{fields_html}</td>"
+        f"<td>{_esc(op.description) or '<em>&mdash;</em>'}{notes_html}</td>"
+        "</tr>"
+    )
+
+
+_CONTRACT_PAGE_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>legacy2mcp discover report</title>
+<style>
+  :root {{ color-scheme: light dark; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          max-width: 1000px; margin: 2.5rem auto; padding: 0 1.5rem; line-height: 1.5; }}
+  h1 {{ margin-bottom: 0.25rem; }}
+  .meta {{ color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; }}
+  th, td {{ text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #e0e0e0; vertical-align: top; }}
+  th {{ background: rgba(127,127,127,0.08); }}
+  code {{ background: rgba(127,127,127,0.12); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }}
+  .muted {{ color: #777; font-size: 0.85em; }}
+  .note {{ color: #a66b00; font-size: 0.85em; }}
+  .badge {{ display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.8em; font-weight: 600; }}
+  .badge.read {{ background: rgba(40,167,69,0.15); color: #1e7e34; }}
+  .badge.write {{ background: rgba(220,53,69,0.15); color: #c82333; }}
+  .badge.unknown {{ background: rgba(127,127,127,0.15); color: #666; }}
+  .badge.needs-review {{ background: rgba(255,193,7,0.2); color: #8a6100; }}
+  ul {{ margin: 0.3rem 0; padding-left: 1.2rem; }}
+  footer {{ margin-top: 3rem; color: #888; font-size: 0.85em; border-top: 1px solid #e0e0e0; padding-top: 1rem; }}
+</style>
+</head>
+<body>
+  <h1>What <code>legacy2mcp discover</code> found</h1>
+  <div class="meta">
+    Source: <code>{source}</code> &middot; Generated {generated_at}<br>
+    {summary}
+  </div>
+
+  <table>
+    <thead><tr><th>Operation</th><th>Effect</th><th>Confidence</th><th>Fields</th><th>Description / notes</th></tr></thead>
+    <tbody>
+      {rows}
+    </tbody>
+  </table>
+
+  <footer>
+    Nothing here is verified against a live backend &mdash; review every operation, then run
+    <code>legacy2mcp init --from-contract &lt;this file&gt; --out config.yaml</code>
+    (this file works as <code>&lt;this file&gt;</code> directly -- the data above is also embedded
+    below for that command to read) or
+    <code>legacy2mcp demo --from-contract &lt;this file&gt;</code> to try it in a chat page right away.
+  </footer>
+  <script type="application/json" id="{element_id}">{contract_json}</script>
+</body>
+</html>
+"""
+
+
+def render_contract_html(contract: LegacyInterfaceContract, source_label: str) -> str:
+    """Renders the same discovered contract render_contract_yaml() does,
+    as a human-readable HTML report -- AND embeds the full contract as
+    JSON in a <script type="application/json"> tag, so this file is also
+    a valid `--from-contract`/`demo --from-contract` input, not just
+    something to look at. `</` is escaped to `<\\/` in the embedded JSON
+    (standard, valid JSON) so a literal "</script>" inside any string
+    value -- a page's extracted text could contain one -- can never be
+    mistaken by an HTML/regex parser for the real closing tag."""
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    by_confidence: dict[str, int] = {}
+    needs_review_count = 0
+    for op in contract.operations:
+        by_confidence[op.confidence] = by_confidence.get(op.confidence, 0) + 1
+        if op.needs_review:
+            needs_review_count += 1
+    summary = (
+        f"{len(contract.operations)} operation(s) found &mdash; "
+        + ", ".join(f"{count} {level}-confidence" for level, count in sorted(by_confidence.items()))
+        + f", {needs_review_count} flagged for review."
+    )
+
+    rows = "".join(_contract_operation_row(op) for op in contract.operations) or (
+        "<tr><td colspan=\"5\"><em>No operations found.</em></td></tr>"
+    )
+
+    contract_json = contract.model_dump_json().replace("</", "<\\/")
+
+    return _CONTRACT_PAGE_TEMPLATE.format(
+        source=_esc(source_label),
+        generated_at=generated_at,
+        summary=summary,
+        rows=rows,
+        element_id=CONTRACT_HTML_ELEMENT_ID,
+        contract_json=contract_json,
+    )
 
 
 def write_config(path: str | Path, text: str) -> Path:

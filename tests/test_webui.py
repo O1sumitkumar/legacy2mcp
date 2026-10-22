@@ -10,7 +10,7 @@ import pytest
 from legacy2mcp.adapters.base import ToolDefinition
 from legacy2mcp.config import AdapterConfig, AuditConfig, Legacy2McpConfig, SecurityConfig, ServerConfig
 from legacy2mcp.server import Legacy2McpApp
-from legacy2mcp.webui import answer_question, example_question, extract_params, pick_tool, start_server
+from legacy2mcp.webui import answer_question, example_question, extract_params, pick_tool, render_page, start_server
 from tests.mock_rest_service import create_app
 
 PORT = 8296
@@ -100,6 +100,18 @@ def test_example_question_omits_unguessable_required_string_param():
     assert example_question(tool_def) == "cancel order"
 
 
+def test_render_page_defaults_to_relative_fetch_paths():
+    page = render_page()
+    assert "const API_BASE = '';" in page
+    assert "fetch(API_BASE + '/tools')" in page
+
+
+def test_render_page_with_base_url_bakes_in_absolute_paths():
+    page = render_page("http://127.0.0.1:9999")
+    assert "const API_BASE = 'http://127.0.0.1:9999';" in page
+    assert "__API_BASE__" not in page
+
+
 def test_every_discovered_tool_round_trips_through_its_own_example():
     # The point of an auto-generated example is that clicking it actually
     # re-matches the same tool it was generated from.
@@ -173,6 +185,10 @@ def test_chat_server_serves_tools_and_answers_over_http():
         with urllib.request.urlopen(f"{base}/tools") as resp:
             tools = json.loads(resp.read())
             assert any(t["name"] == "legacy_get_order" for t in tools)
+            # A saved chat.html (see `legacy2mcp demo`/render_page(base_url))
+            # fetches this from a different origin (file://...) -- the
+            # browser only lets its JS read the response if this is set.
+            assert resp.headers.get("Access-Control-Allow-Origin") == "*"
 
         req = urllib.request.Request(
             f"{base}/ask",

@@ -63,6 +63,57 @@ def test_missing_file_raises_contract_error():
         load_contract("/does/not/exist.yaml")
 
 
+def test_round_trips_through_html_file(tmp_path):
+    from legacy2mcp.discovery.generate import render_contract_html
+
+    contract = LegacyInterfaceContract(
+        source_label="https://example.com/",
+        generated_at="2026-01-01T00:00:00+00:00",
+        operations=[
+            ContractOperation(
+                name="get_home",
+                source_kind="rest",
+                method="GET",
+                path="/",
+                fields=[ContractField(name="q", location="query", type="string")],
+            )
+        ],
+    )
+    path = tmp_path / "contract.html"
+    path.write_text(render_contract_html(contract, contract.source_label))
+
+    reloaded = load_contract(str(path))
+    assert reloaded.source_label == "https://example.com/"
+    assert reloaded.operations[0].name == "get_home"
+    assert reloaded.operations[0].fields[0].name == "q"
+
+
+def test_html_round_trip_survives_a_literal_closing_script_tag_in_content(tmp_path):
+    # A page's extracted text (discovery/webpage.py) could itself contain
+    # the literal string "</script>" -- that must not be mistaken for the
+    # real closing tag when the embedded JSON is parsed back out.
+    from legacy2mcp.discovery.generate import render_contract_html
+
+    tricky = 'Some text with a literal </script> tag inside it.'
+    contract = LegacyInterfaceContract(
+        source_label="https://example.com/",
+        generated_at="2026-01-01T00:00:00+00:00",
+        operations=[ContractOperation(name="get_home", source_kind="rest", method="GET", path="/", notes=[tricky])],
+    )
+    path = tmp_path / "contract.html"
+    path.write_text(render_contract_html(contract, contract.source_label))
+
+    reloaded = load_contract(str(path))
+    assert reloaded.operations[0].notes[0] == tricky
+
+
+def test_html_without_embedded_contract_data_raises(tmp_path):
+    path = tmp_path / "not_a_contract.html"
+    path.write_text("<html><body>just a regular page</body></html>")
+    with pytest.raises(ContractError):
+        load_contract(str(path))
+
+
 def test_defaults_are_conservative():
     field = ContractField(name="x")
     assert field.required is False

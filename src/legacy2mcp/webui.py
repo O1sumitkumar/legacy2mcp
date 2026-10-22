@@ -277,8 +277,9 @@ _PAGE = """<!doctype html>
   </main>
 </div>
 <script>
+const API_BASE = '__API_BASE__';
 async function loadTools() {
-  const res = await fetch('/tools');
+  const res = await fetch(API_BASE + '/tools');
   const tools = await res.json();
   const container = document.getElementById('tools');
   container.innerHTML = '';
@@ -331,7 +332,7 @@ function addMsg(role, text, toolName) {
 async function ask(question) {
   addMsg('user', question);
   try {
-    const res = await fetch('/ask', { method: 'POST', body: JSON.stringify({ question }) });
+    const res = await fetch(API_BASE + '/ask', { method: 'POST', body: JSON.stringify({ question }) });
     const data = await res.json();
     addMsg('assistant', data.answer, data.tool);
   } catch (err) {
@@ -355,6 +356,20 @@ loadTools();
 """
 
 
+def render_page(base_url: str = "") -> str:
+    """The chat page's HTML. With the default `base_url=""`, its `fetch()`
+    calls stay relative ('/tools', '/ask') -- same-origin, which is what
+    `do_GET`'s own '/' route serves. Passing the server's own
+    `http://host:port` makes every call absolute instead, which is what
+    turns this into a *standalone* file (see `legacy2mcp demo`): save the
+    result to disk and it still talks to that server correctly when
+    opened directly (as a file://... page, a different origin than the
+    server), as long as that server process is still running -- the page
+    itself has no backend of its own, it's still making a real HTTP call
+    to the server for every question."""
+    return _PAGE.replace("__API_BASE__", base_url)
+
+
 def _make_handler(app: Legacy2McpApp) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args: object) -> None:  # silence default access logging
@@ -365,13 +380,21 @@ def _make_handler(app: Legacy2McpApp) -> type[BaseHTTPRequestHandler]:
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            # The chat page served at '/' never needs this (same origin), but
+            # a saved chat.html opened as a file://... page -- see
+            # render_page()/`legacy2mcp demo` -- is a different origin than
+            # this server, and the browser enforces CORS even for localhost.
+            # This is a local, no-auth, loopback-by-default dev tool with no
+            # cookie/session to steal, so a permissive origin is the right
+            # tradeoff for "the exported file just works".
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
 
         def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler's naming convention)
             path = urlparse(self.path).path
             if path == "/":
-                body = _PAGE.encode("utf-8")
+                body = render_page().encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
