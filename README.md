@@ -31,7 +31,7 @@
   <a href="#client-mcp-inspector"><img src="https://img.shields.io/badge/Tested%20with-MCP%20Inspector-22C55E" alt="Tested with MCP Inspector"></a>
 </p>
 
-### Convert anything to MCP in 60 seconds. Read-only by default, with every call audit-logged.
+## Convert anything to MCP in 60 seconds. Read-only by default, with every call audit-logged.
 
 </div>
 
