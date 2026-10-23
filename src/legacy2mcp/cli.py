@@ -68,6 +68,18 @@ def _cmd_inspect(args: argparse.Namespace) -> None:
             }
             for _, tool_def in app._tools.values()
         ]
+        tool_name = getattr(args, "tool", None)
+        if tool_name is not None:
+            matches = [tool for tool in tools if tool["name"] == tool_name]
+            if not matches:
+                available = ", ".join(tool["name"] for tool in tools) or "none"
+                print(
+                    f"error: no tool named {tool_name!r}; available tools: {available}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            tools = matches
+
         print(json.dumps(tools, indent=2, default=str))
     finally:
         app.close()
@@ -513,6 +525,7 @@ def main() -> None:
         "inspect", help="Load a config, discover tools, and print them as JSON (no server started)."
     )
     inspect_parser.add_argument("--config", required=True, help="Path to config.yaml")
+    inspect_parser.add_argument("--tool", help="Show only the tool with this exact name.")
     inspect_parser.set_defaults(func=_cmd_inspect)
 
     install_skill_parser = subparsers.add_parser(

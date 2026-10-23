@@ -533,6 +533,9 @@ legacy2mcp inspect --config config.yaml
 # Print the tool list as JSON, for scripting or a CI diff check
 legacy2mcp inspect --config config.yaml > tools.json
 
+# Show only one exact tool name
+legacy2mcp inspect --config config.yaml --tool legacy_get_order
+
 # Start the MCP server (stdio)
 legacy2mcp run --config config.yaml
 
