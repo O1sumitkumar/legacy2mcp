@@ -33,9 +33,28 @@
 
 <p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, REST API, or website into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
-<img src="assets/quickstart.png" alt="Quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, which writes config.yaml and opens a local test-chat page -- click an example question and get a real response from the live API, no AI key needed" width="820">
-
 </div>
+
+```bash
+$ pip install legacy2mcp
+$ legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
+
+Wrote config.yaml (rest adapter, 19 tool source(s) detected).
+Wrote config.html -- a plain-English summary of what this MCP server does.
+Next: legacy2mcp inspect --config config.yaml
+
+Connect an MCP client to this server:
+
+Claude Desktop (claude_desktop_config.json) / Cursor (.cursor/mcp.json):
+  { "mcpServers": { "legacy2mcp": { "command": "uvx", "args": [...] } } }
+# ...and the same for VS Code / Claude Code -- see "Client support" below
+
+Opening a test chat at http://127.0.0.1:54213 (no AI key needed -- Ctrl+C to stop).
+```
+
+That's the whole thing, run from a real terminal: `config.yaml` written, a
+browser tab open with a working chat against the live API, and the exact
+JSON to paste into your AI client of choice, all from one command.
 
 ---
 
