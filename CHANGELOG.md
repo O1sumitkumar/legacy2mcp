@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-23
+
+### Added
+
+- **`legacy2mcp discover` now auto-launches the demo too**, not just
+  `init`. In an interactive terminal, once the contract is written, if it
+  has anything invocable in it, `discover` also writes a runnable
+  `config.yaml` (`--write-config`/`--no-write-config`), starts the same
+  no-API-key test-chat server `init` can auto-launch, and prints the same
+  MCP client connection snippet (see below) -- `--no-chat` opts out (the
+  default already, in non-interactive/CI runs). A contract with nothing
+  invocable (stored-procs/queue-only) skips the demo with a clear message
+  instead of failing the command -- the contract is still written either
+  way.
+- **A ready-to-paste MCP client connection snippet** (`legacy2mcp/
+  client_snippet.py`), printed by `init` and `demo` (and now `discover`,
+  above) right after a runnable `config.yaml` exists: the exact JSON
+  shown in README.md's "Client support" section (Claude Desktop/Cursor,
+  VS Code) plus the Claude Code `claude mcp add` one-liner, with the
+  real absolute path already filled in -- connecting it to an AI client
+  for real is a copy-paste, not a separate trip to the README.
+- **`legacy2mcp demo --from-contract` now also writes a real
+  `config.yaml`** alongside the chat page (`--write-config`/
+  `--no-write-config`) -- previously the config it built only existed
+  in memory for the demo server, so there was nothing on disk for an MCP
+  client (or a later `legacy2mcp run`) to actually point at once the
+  demo was done.
+
 ## [0.4.1] - 2026-10-22
 
 ### Fixed

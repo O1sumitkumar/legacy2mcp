@@ -97,7 +97,11 @@ local keyword matching against the tools it just discovered, just enough
 to sanity-check that the generated server actually works. (Prefer the raw
 tool list instead? `legacy2mcp inspect --config config.yaml`.)
 
-Next, connect it to your AI client for real — see [Client support](#client-support).
+It also prints a ready-to-paste JSON block for Claude Desktop, Cursor, VS
+Code, and a `claude mcp add` one-liner for Claude Code — connecting it to
+your AI client for real is a copy-paste, not a separate step. `legacy2mcp
+discover` (below) does the same: write a contract, auto-open the same test
+chat, and print the same connection snippet, in one command.
 
 Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
 flags) walks you through it — see
@@ -371,24 +375,35 @@ writes, and a **confidence level** -- `high` for a live schema/catalog,
 `medium` for a curated artifact like a Postman collection, `low` for
 anything inferred from sampled traffic -- plus `needs_review` flags and
 notes on anything uncertain. Review it like you'd review `config.yaml`'s
-`# TODO`s, then turn it into a runnable server:
+`# TODO`s.
+
+Run that same command from a real terminal, though, and `discover` doesn't
+stop at the contract: if the contract has anything invocable in it (not
+every source does yet -- see below), it also writes a runnable
+`config.yaml`, opens the same no-API-key test-chat page `init` can
+auto-launch, and prints the same ready-to-paste MCP client JSON --
+discover, try it, and get the connection snippet, in the one command you
+already ran. Pass `--no-chat` to skip that and just get the contract (the
+default in non-interactive/CI runs already), or `--no-write-config` to skip
+only the `config.yaml` write.
+
+Prefer to review the contract first before anything gets built or run? Skip
+straight to either step yourself instead:
 
 ```bash
 legacy2mcp init --from-contract contract.yaml --out config.yaml
-```
-
-Or skip straight to trying it, no `config.yaml` step needed:
-
-```bash
 legacy2mcp demo --from-contract contract.yaml
 ```
 
-That starts the same no-API-key test-chat server `init` can auto-launch, and
-saves a standalone `chat.html` pointing at it -- opened automatically unless
-you pass `--no-open`. The command has to keep running (`Ctrl+C` to stop) for
-that page to work; it's a thin client page with no backend of its own, so
-the real HTTP calls still have to be made by *something*, same reason the
-browser can't just open a config file and call a REST API directly.
+`demo` is the same "try it" step `discover` can auto-launch, just callable
+on its own (also works from an existing `--config config.yaml`, not only a
+contract) -- it saves a standalone `chat.html` pointing at the server it
+just started (opened automatically unless `--no-open`), and prints the
+client JSON once a config exists to point it at. The command has to keep
+running (`Ctrl+C` to stop) for that page to work; it's a thin client page
+with no backend of its own, so the real HTTP calls still have to be made by
+*something*, same reason the browser can't just open a config file and
+call a REST API directly.
 
 A few things worth knowing:
 
@@ -434,7 +449,10 @@ A few things worth knowing:
   yet.** `--stored-procs` and `--queue-config` still produce real contract
   entries -- there's no adapter to actually *call* either today (see
   [docs/roadmap.md](docs/roadmap.md)), so `init --from-contract` skips them
-  with a clear TODO rather than pretending they work.
+  with a clear TODO rather than pretending they work. Same reason
+  `discover`'s auto-demo (above) has nothing to launch for a contract made
+  up only of those -- it says so and just exits with the contract already
+  written, rather than failing the whole command.
 - **Every generated server also gets a `describe_capabilities` tool** for
   free -- a connected agent can call it to ask "what can this system do?"
   (every tool's description, side effect, confidence, required fields,
