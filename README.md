@@ -40,6 +40,44 @@
 > [!NOTE]
 > `legacy2mcp` introspects your legacy system live — every WSDL operation, every database table, every REST spec it can find — and builds a real JSON Schema for each tool from it. Every [MCP](https://modelcontextprotocol.io/) tool call is **schema-validated before it reaches your backend**, **write operations are excluded by default**, and **every call is audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
 
+## Quick start
+
+No API key, no cloning — pick whichever matches what you actually have,
+against live public demo targets:
+
+```bash
+pip install legacy2mcp
+
+# REST API -- tries OpenAPI/Swagger discovery
+legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
+
+# WSDL / SOAP service -- zeep introspects it live, no scan needed
+legacy2mcp init --wsdl-url "http://www.dneonline.com/calculator.asmx?WSDL"
+
+# A website with no API docs at all -- crawls it for forms/content
+legacy2mcp init --webpage-url "https://legacy2mcp.com/"
+```
+
+Run any one of those from a real terminal and that's the whole thing: it
+writes `config.yaml`, opens a local test-chat page with a clickable example
+question under every discovered tool — click one and see a real response
+come back from the live source, no AI key needed, just local keyword
+matching to sanity-check the server works — and prints a ready-to-paste
+connection snippet for Claude Desktop, Cursor, VS Code, and Claude Code.
+Wiring it into a real AI client is a copy-paste, not a separate step.
+(Prefer the raw tool list instead? `legacy2mcp inspect --config config.yaml`.)
+
+[`legacy2mcp discover`](#discover-a-legacy-interface-before-generating-a-server)
+does the same for sources that benefit from a review step first (a
+Postman collection, a HAR capture, …): write a contract, open the same
+test chat, print the same connection snippet — one command either way.
+
+Have your own WSDL, REST API, website, or codebase instead? `legacy2mcp
+init` (no flags) walks you through it — see
+[Generate a config automatically](#generate-a-config-automatically). More
+demos (a local SOAP service, Docker, a WSDL served by raw URL) are listed in
+[examples/](examples/README.md).
+
 ## Contents
 
 - [Install](#install)
@@ -78,44 +116,6 @@ pip install legacy2mcp
 ```
 
 Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.bvenkata/legacy2mcp)** as `io.github.bvenkata/legacy2mcp`, so registry-aware MCP clients can discover it directly.
-
-## Quick start
-
-No API key, no cloning — pick whichever matches what you actually have,
-against live public demo targets:
-
-```bash
-pip install legacy2mcp
-
-# REST API -- tries OpenAPI/Swagger discovery
-legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
-
-# WSDL / SOAP service -- zeep introspects it live, no scan needed
-legacy2mcp init --wsdl-url "http://www.dneonline.com/calculator.asmx?WSDL"
-
-# A website with no API docs at all -- crawls it for forms/content
-legacy2mcp init --webpage-url "https://legacy2mcp.com/"
-```
-
-Run any one of those from a real terminal and that's the whole thing: it
-writes `config.yaml`, opens a local test-chat page with a clickable example
-question under every discovered tool — click one and see a real response
-come back from the live source, no AI key needed, just local keyword
-matching to sanity-check the server works — and prints a ready-to-paste
-connection snippet for Claude Desktop, Cursor, VS Code, and Claude Code.
-Wiring it into a real AI client is a copy-paste, not a separate step.
-(Prefer the raw tool list instead? `legacy2mcp inspect --config config.yaml`.)
-
-[`legacy2mcp discover`](#discover-a-legacy-interface-before-generating-a-server)
-does the same for sources that benefit from a review step first (a
-Postman collection, a HAR capture, …): write a contract, open the same
-test chat, print the same connection snippet — one command either way.
-
-Have your own WSDL, REST API, website, or codebase instead? `legacy2mcp
-init` (no flags) walks you through it — see
-[Generate a config automatically](#generate-a-config-automatically). More
-demos (a local SOAP service, Docker, a WSDL served by raw URL) are listed in
-[examples/](examples/README.md).
 
 ## How it works
 
