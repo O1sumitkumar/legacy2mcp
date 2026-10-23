@@ -1,5 +1,36 @@
 # Contributing
 
+New here? Start with an issue labeled
+[`good first issue`](https://github.com/bvenkata/legacy2mcp/labels/good%20first%20issue)
+-- small, self-contained, scoped to one file or one function. Looking for
+something bigger? [`help wanted`](https://github.com/bvenkata/legacy2mcp/labels/help%20wanted)
+issues are real gaps that need more design/discussion, not busywork. Either
+way, comment on the issue before starting so two people don't duplicate
+work, and feel free to ask questions on it -- that's what it's there for.
+
+## What's next (short version)
+
+The authoritative, up-to-date list is always the open
+[`good first issue`](https://github.com/bvenkata/legacy2mcp/labels/good%20first%20issue)/
+[`help wanted`](https://github.com/bvenkata/legacy2mcp/labels/help%20wanted)
+issues, not this file -- but in short, the biggest gaps today are:
+
+- **Queue adapter** (`type: queue`) -- `discover --queue-config` already
+  captures queue descriptions into a contract; there's no runtime adapter
+  to actually publish/subscribe yet.
+- **Stored-procedure calling** -- `discover --stored-procs` already reads
+  a live procedure/function catalog; calling one at runtime (same
+  named-parameter posture the `db` adapter already uses for tables) is
+  still future work.
+- **A direct `init --db-dialect ... --db-dsn-env ...` entry point** --
+  today a `db` config only comes from a repo scan (ORM detection) or a
+  hand-written config; there's no live "point at a database and get a
+  starter config" path the way `--wsdl-url`/`--rest-url`/`--webpage-url`
+  already have.
+- **HTTP/SSE transport** -- `stdio` only today.
+
+Full version-by-version history: [docs/roadmap.md](docs/roadmap.md).
+
 ## Development setup
 
 ```bash
