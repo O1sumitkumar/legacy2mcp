@@ -37,9 +37,6 @@
 
 ---
 
-> [!NOTE]
-> `legacy2mcp` introspects your legacy system live — every WSDL operation, every database table, every REST spec it can find — and builds a real JSON Schema for each tool from it. Every [MCP](https://modelcontextprotocol.io/) tool call is **schema-validated before it reaches your backend**, **write operations are excluded by default**, and **every call is audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
-
 ## Quick start
 
 No API key, no cloning — pick whichever matches what you actually have,
@@ -77,6 +74,9 @@ init` (no flags) walks you through it — see
 [Generate a config automatically](#generate-a-config-automatically). More
 demos (a local SOAP service, Docker, a WSDL served by raw URL) are listed in
 [examples/](examples/README.md).
+
+> [!NOTE]
+> `legacy2mcp` introspects your legacy system live — every WSDL operation, every database table, every REST spec it can find — and builds a real JSON Schema for each tool from it. Every [MCP](https://modelcontextprotocol.io/) tool call is **schema-validated before it reaches your backend**, **write operations are excluded by default**, and **every call is audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
 
 ## Contents
 
