@@ -132,6 +132,39 @@ def test_init_from_wsdl_url_needs_no_llm_or_network(tmp_path, monkeypatch):
 
     _cmd_init(_args(wsdl_url="https://svc.example.com/Legacy?wsdl", out=str(out_path)))
 
+
+def test_init_rejects_an_html_out_path_before_writing_anything(tmp_path, monkeypatch):
+    # Regression: --out must always be a loadable YAML config (run/inspect/
+    # demo --config all read it as one) -- an .html path here used to
+    # silently corrupt the file, because the auto-generated report's
+    # default name is also *.html and collided with (and overwrote) it.
+    out_path = tmp_path / "contract.html"
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    with pytest.raises(SystemExit):
+        _cmd_init(_args(wsdl_url="https://svc.example.com/Legacy?wsdl", out=str(out_path)))
+
+    assert not out_path.exists()
+
+
+def test_init_skips_the_html_report_if_it_would_overwrite_out(tmp_path, monkeypatch):
+    # Defensive even when --out itself is fine: an explicit --html-out that
+    # happens to match --out must never clobber the config we just wrote.
+    out_path = tmp_path / "config.yaml"
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    _cmd_init(
+        _args(
+            wsdl_url="https://svc.example.com/Legacy?wsdl",
+            out=str(out_path),
+            html_out=str(out_path),
+            no_html_report=False,
+        )
+    )
+
+    reloaded = load_config(str(out_path))
+    assert reloaded.adapters[0].type == "soap"
+
     config = load_config(str(out_path))
     assert config.adapters[0].type == "soap"
     assert config.adapters[0].soap_settings().wsdl_url == "https://svc.example.com/Legacy?wsdl"

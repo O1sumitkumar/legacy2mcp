@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-22
+
+### Fixed
+
+- **`legacy2mcp init --out <path>.html` no longer silently corrupts the
+  config it just wrote.** `--out` always has to be a loadable YAML
+  config (`run`/`inspect`/`demo --config` all read it as one) -- an
+  `.html`/`.htm` path there is now a clear error before anything is
+  written, rather than being accepted and then clobbered: the
+  auto-generated plain-English report defaults to the same `*.html`
+  name as `--out` when `--out` already ends in `.html`, so the report
+  write used to silently overwrite the just-written config with its own
+  (non-YAML) content -- the next `inspect`/chat-launch step would then
+  fail with a confusing YAML parse error pointing at the HTML markup.
+  Also guarded the same collision defensively for an explicit
+  `--html-out` that happens to match `--out`.
+
 ## [0.4.0] - 2026-10-22
 
 ### Added

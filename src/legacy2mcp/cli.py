@@ -251,6 +251,25 @@ def _cmd_init(args: argparse.Namespace) -> None:
     is ambiguous enough to optionally use an LLM, and only to refine what
     static AST analysis already found -- see discovery/."""
     interactive = sys.stdin.isatty()
+
+    if Path(args.out).suffix.lower() in (".html", ".htm"):
+        # --out always has to be a loadable YAML config -- `run`/`inspect`/
+        # `demo --config` all read it as one. An .html path here is almost
+        # always someone reaching for `discover --out contract.html`'s
+        # extension-picks-the-format behavior by mistake; that only applies
+        # to `discover`, not `init`. Catch it before writing anything --
+        # letting it through used to silently corrupt the file, since the
+        # auto-generated report's default name is also *.html and would
+        # collide with (and overwrite) this same path.
+        print(
+            f"error: --out must be a YAML path (e.g. config.yaml) -- '{args.out}' looks like HTML. "
+            f"The human-readable report is written automatically as *.html next to --out already "
+            f"(see --html-out/--no-html-report) -- you don't need to point --out at one yourself. "
+            f"For a Legacy Interface Contract as HTML, see `legacy2mcp discover --out contract.html`.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     kind, value = _resolve_source(args, interactive)
 
     cloned_path = None
@@ -304,8 +323,18 @@ def _cmd_init(args: argparse.Namespace) -> None:
         html_path = None
         if not args.no_html_report:
             html_out = args.html_out or str(Path(args.out).with_suffix(".html"))
-            html_text = report.render_html(config, source_label, todos)
-            html_path = report.write_report(html_out, html_text)
+            if Path(html_out).resolve() == Path(args.out).resolve():
+                # Guards any other way these two could end up equal (an
+                # explicit --html-out matching --out, say) -- never
+                # silently overwrite the config we just wrote.
+                print(
+                    f"warning: the HTML report's path ('{html_out}') would overwrite --out -- "
+                    f"skipping it. Pass a different --html-out, or --no-html-report.",
+                    file=sys.stderr,
+                )
+            else:
+                html_text = report.render_html(config, source_label, todos)
+                html_path = report.write_report(html_out, html_text)
     except (RepoError, ContractError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
