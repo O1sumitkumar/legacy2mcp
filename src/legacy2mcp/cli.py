@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from legacy2mcp import client_snippet, webui
-from legacy2mcp.config import Legacy2McpConfig, load_config
+from legacy2mcp.config import ConfigError, Legacy2McpConfig, load_config
 from legacy2mcp.discovery import classify, generate, har, openapi, postman, queue_contract, repo, report, scan, storedproc, webpage
 from legacy2mcp.discovery.contract import ContractError, load_contract
 from legacy2mcp.discovery.llm import DEFAULT_BASE_URL, DEFAULT_MODEL, OpenAiLlmClient
@@ -21,12 +21,22 @@ from legacy2mcp.install_skill import install_skill
 from legacy2mcp.server import Legacy2McpApp
 
 
+def _load_config_or_exit(path: str) -> Legacy2McpConfig:
+    """load_config() for the CLI: a bad --config prints one `error: ...`
+    line and exits 1 instead of dumping a traceback."""
+    try:
+        return load_config(path)
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def _cmd_run(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
-    config = load_config(args.config)
+    config = _load_config_or_exit(args.config)
     app = Legacy2McpApp(config)
 
     if config.server.transport != "stdio":
@@ -46,7 +56,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
 def _cmd_inspect(args: argparse.Namespace) -> None:
     """Dry-run: load config, discover tools, print them as JSON. No MCP transport."""
     logging.basicConfig(level=logging.WARNING)
-    config = load_config(args.config)
+    config = _load_config_or_exit(args.config)
     app = Legacy2McpApp(config)
     try:
         tools = [
@@ -183,7 +193,7 @@ def _cmd_demo(args: argparse.Namespace) -> None:
         else:
             app_config = load_config(args.config)
             config_path = Path(args.config)
-    except ContractError as exc:
+    except (ContractError, ConfigError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
 

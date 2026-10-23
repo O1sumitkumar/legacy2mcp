@@ -20,7 +20,13 @@ import os
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
+
+class ConfigError(Exception):
+    """Raised when a config file is missing, unreadable, not valid YAML, or
+    fails schema validation -- one exception type the CLI can turn into a
+    clean `error: ...` line, same idea as `ContractError` for contracts."""
 
 
 class BasicAuthConfig(BaseModel):
@@ -232,6 +238,29 @@ class Legacy2McpConfig(BaseModel):
 
 
 def load_config(path: str) -> Legacy2McpConfig:
-    with open(path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-    return Legacy2McpConfig.model_validate(raw)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError as exc:
+        raise ConfigError(f"config file not found: '{path}'") from exc
+    except OSError as exc:
+        raise ConfigError(f"could not read config file '{path}': {exc.strerror or exc}") from exc
+
+    try:
+        raw = yaml.safe_load(text) or {}
+    except yaml.YAMLError as exc:
+        where = ""
+        mark = getattr(exc, "problem_mark", None)
+        if mark is not None:
+            where = f" (line {mark.line + 1}, column {mark.column + 1})"
+        problem = getattr(exc, "problem", None) or "parse error"
+        raise ConfigError(f"config file '{path}' is not valid YAML{where}: {problem}") from exc
+
+    try:
+        return Legacy2McpConfig.model_validate(raw)
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in err['loc']) or '(top level)'}: {err['msg']}"
+            for err in exc.errors()
+        )
+        raise ConfigError(f"config file '{path}' is invalid: {problems}") from exc
