@@ -4,7 +4,7 @@
 
 <div align="center">
 
-<img src="assets/banner.svg" alt="legacy2mcp — legacy SOAP/WSDL turned into safe, typed MCP tools" width="820">
+<img src="assets/banner.svg" alt="legacy2mcp — legacy SOAP/WSDL, database, REST API, or website turned into safe, typed MCP tools" width="820">
 
 <p>
   <a href="https://github.com/bvenkata/legacy2mcp/actions/workflows/ci.yml"><img src="https://github.com/bvenkata/legacy2mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -31,7 +31,7 @@
   <a href="#client-mcp-inspector"><img src="https://img.shields.io/badge/Tested%20with-MCP%20Inspector-22C55E" alt="Tested with MCP Inspector"></a>
 </p>
 
-<p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, or REST API into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
+<p><b>legacy2mcp turns a legacy SOAP/WSDL service, database, REST API, or website into a working MCP server in 60 seconds. Read-only by default, with every call audit-logged.</b></p>
 
 <img src="assets/quickstart.png" alt="Quick start: pip install legacy2mcp, then legacy2mcp init --rest-url against the public Swagger Petstore, which writes config.yaml and opens a local test-chat page -- click an example question and get a real response from the live API, no AI key needed" width="820">
 
@@ -40,7 +40,7 @@
 ---
 
 > [!NOTE]
-> `legacy2mcp` introspects a legacy system — every operation in a WSDL, or a database's live schema — builds a real JSON Schema for each tool **from that introspected schema**, and exposes them as [MCP](https://modelcontextprotocol.io/) tools — with **every call schema-validated before it reaches your SOAP endpoint or database**, **write-like/write operations excluded by default**, and **every call audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
+> `legacy2mcp` introspects your legacy system live — every WSDL operation, every database table, every REST spec it can find — and builds a real JSON Schema for each tool from it. Every [MCP](https://modelcontextprotocol.io/) tool call is **schema-validated before it reaches your backend**, **write operations are excluded by default**, and **every call is audit-logged**. No hand-written adapter code, no hand-maintained schemas, no arbitrary SQL from the LLM.
 
 ## Contents
 
@@ -90,18 +90,19 @@ pip install legacy2mcp
 legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
 ```
 
-Run that from a real terminal and it opens a local test-chat page in your
-browser automatically — click one of the example questions and see a real
-response come back from the live API. No AI key needed for this part; it's
-local keyword matching against the tools it just discovered, just enough
-to sanity-check that the generated server actually works. (Prefer the raw
-tool list instead? `legacy2mcp inspect --config config.yaml`.)
+Run that from a real terminal and that's the whole thing: it writes
+`config.yaml`, opens a local test-chat page with a clickable example
+question under every discovered tool — click one and see a real response
+come back from the live API, no AI key needed, just local keyword matching
+to sanity-check the server works — and prints a ready-to-paste connection
+snippet for Claude Desktop, Cursor, VS Code, and Claude Code. Wiring it
+into a real AI client is a copy-paste, not a separate step. (Prefer the
+raw tool list instead? `legacy2mcp inspect --config config.yaml`.)
 
-It also prints a ready-to-paste JSON block for Claude Desktop, Cursor, VS
-Code, and a `claude mcp add` one-liner for Claude Code — connecting it to
-your AI client for real is a copy-paste, not a separate step. `legacy2mcp
-discover` (below) does the same: write a contract, auto-open the same test
-chat, and print the same connection snippet, in one command.
+[`legacy2mcp discover`](#discover-a-legacy-interface-before-generating-a-server)
+does the same for sources that benefit from a review step first (a
+Postman collection, a HAR capture, …): write a contract, open the same
+test chat, print the same connection snippet — one command either way.
 
 Have your own WSDL, REST API, website, or codebase instead? `legacy2mcp
 init` (no flags) walks you through it — see
@@ -157,7 +158,7 @@ it ever reaches your backend — not after.
 |---|---|---|---|
 | Schema source | Typed by hand, per tool | The OpenAPI spec, if one exists | The live WSDL / DB schema, or a discovered OpenAPI spec |
 | Can drift from the real system | Yes — nothing re-checks it | Only if the spec itself is stale | No — rebuilt from the live source at startup |
-| Covers SOAP / a database | You write that client code yourself | No — REST/OpenAPI only | Yes, plus REST |
+| Covers SOAP / a database | You write that client code yourself | No — REST/OpenAPI only | Yes, plus REST and plain websites |
 | Write operations hidden by default | No — you remember to gate each one | No — usually exposes everything the spec defines | Yes — explicit `allow_write_operations` opt-in |
 | Audit log of every call | DIY | Usually no | Built in |
 | Time to a working server | Hours to days, per system | Minutes, for a REST API with a spec | Minutes — `legacy2mcp init` |
@@ -427,31 +428,20 @@ A few things worth knowing:
   (`mitmdump --set hardump=out.har`, or "Export as HAR" in the GUI). This
   is the lowest-confidence source (inferred from whatever was sampled, not
   a declared contract) -- every operation comes back flagged for review.
-- **`--webpage-url`** is for the legacy web app -- or the plain content
-  site -- that has no OpenAPI spec, no Postman collection, and nobody
-  around who remembers capturing a HAR, just a URL in a browser. It
-  crawls same-site pages starting there (following `<a href>` links,
-  bounded by `--max-pages`/`--max-depth`, default 25 pages / depth 2) and
-  turns every `<form>` it finds into an operation (method/action become
-  the REST method/path, each `<input>`/`<select>`/`<textarea>` a typed
-  field -- a `<select>`'s options, or a group of radio/checkbox inputs
-  sharing a name, become an `enum`), plus one read-only "get this page"
-  tool per page that has no form but does have real text content --
-  calling that tool returns the page's extracted text, not a structured
-  API response. No JavaScript is executed, no link off the starting
-  site's host is ever followed, and no form is ever submitted -- every
-  page is a single `GET` plus HTML parsing. Same lowest-confidence
-  posture as `--har-file`, with one extra caveat on form operations:
-  HTML forms normally POST as `application/x-www-form-urlencoded`, but
-  the REST adapter always sends a JSON body, so every non-GET form gets
-  a note to double-check that the backend actually accepts JSON before
-  you rely on it. Unlike every other `discover` source, legacy2mcp
-  already knows the real `base_url` here (it's the host it just
-  fetched) -- so `init --from-contract` on a webpage-sourced contract
-  fills that in automatically instead of leaving `REPLACE_ME_BASE_URL`,
-  and the no-API-key test-chat page (see [Quick
-  start](#quick-start)) opens right away with real example questions
-  for whatever your site turned into tools.
+- **`--webpage-url`** is for a legacy web app or content site with no API
+  docs at all -- just a URL. It crawls same-site pages from there
+  (`--max-pages`/`--max-depth` bound it, default 25 pages / depth 2,
+  never leaving the starting host), turning every `<form>` into an
+  operation (a `<select>`'s options, or a shared-name radio/checkbox
+  group, become an `enum`) and every form-less page with real content
+  into a read-only "get this page" tool. No JavaScript is executed and
+  nothing is ever submitted; non-GET forms get a note to confirm the
+  backend accepts a JSON body (the REST adapter always sends one, even
+  though a real browser would POST `application/x-www-form-urlencoded`).
+  Same lowest-confidence posture as `--har-file` -- but unlike every
+  other `discover` source, `base_url` fills in automatically (it's the
+  host just fetched), so the test-chat page opens right away. Full crawl
+  mechanics: [docs/security.md](docs/security.md).
 - **Stored procedures and queue descriptions are documented, not runnable
   yet.** `--stored-procs` and `--queue-config` still produce real contract
   entries -- there's no adapter to actually *call* either today (see
@@ -510,11 +500,22 @@ legacy2mcp init --rest-url "https://api.example.com" --out config.yaml
 # Generate a config from a WSDL URL directly -- no scan needed
 legacy2mcp init --wsdl-url "https://service.example.com/Legacy?wsdl" --out config.yaml
 
+# Generate a config from a website with no API docs at all -- crawls it
+legacy2mcp init --webpage-url "https://your-legacy-app.example.com" --out config.yaml
+
 # Generate a config by statically scanning a GitHub repo (no AI, no API key)
 legacy2mcp init --github-url https://github.com/you/your-api --scan-only --out config.yaml
 
 # Same, with AI-assisted refinement of ambiguous parameter types / read-vs-write
 legacy2mcp init --github-url https://github.com/you/your-api --llm-api-key-env OPENAI_API_KEY --out config.yaml
+
+# Review a source before generating anything -- a Postman collection, OpenAPI
+# file, HAR capture, stored-procedure catalog, or queue description
+legacy2mcp discover --postman-file my-collection.json --out contract.yaml
+
+# Try a config or contract in a chat page right now, no separate init step
+legacy2mcp demo --from-contract contract.yaml
+legacy2mcp demo --config config.yaml
 
 # Review the tools a config generates -- no server started
 legacy2mcp inspect --config config.yaml
@@ -667,8 +668,9 @@ Passing secrets and troubleshooting: [docs/clients.md](docs/clients.md).
 | **Transport** | `stdio` (the transport Claude Desktop and most agent frameworks spawn) |
 | **DB dialects** | Postgres, SQL Server, Oracle — table allowlist (`select`/`insert`) with live schema introspection, plus named parameterized queries |
 | **REST** | explicit endpoint allowlist (method + path + typed params) from config or `legacy2mcp init` — no live schema to introspect, so nothing here is verified until you run it |
-| **Discover sources** | Postman collections, local OpenAPI/Swagger files, a live DB's stored-procedure catalog, HAR traffic captures, declarative queue descriptions → a reviewable `contract.yaml` (confidence, enums, error codes) → `legacy2mcp init --from-contract` |
+| **Discover sources** | Postman collections, local OpenAPI/Swagger files, a live DB's stored-procedure catalog, HAR traffic captures, declarative queue descriptions, and websites (`--webpage-url`, crawled for forms/content) → a reviewable `contract.yaml` (confidence, enums, error codes) → `legacy2mcp init --from-contract` or straight into `init --webpage-url`/`demo` |
 | **`describe_capabilities`** | every generated server exposes this meta-tool for free — an agent can ask what the server can do before calling anything |
+| **Try it + connect** | `init`/`discover`/`demo` all auto-open a no-API-key test-chat page and print a ready-to-paste connection snippet for Claude Desktop, Cursor, VS Code, and Claude Code |
 
 See [docs/security.md](docs/security.md) for the full, honest security model — what's covered today and what isn't yet.
 
@@ -816,8 +818,11 @@ Call the same generated, validated tools from your own code via any MCP client l
 | **v0.1** | SOAP/WSDL adapter, schema generation, validation, read-only default, audit log, `run` + `inspect` CLI, basic auth, stdio | ✅ shipped |
 | **v0.2** | Database adapter (Postgres / SQL Server / Oracle; table/operation allowlists + named parameterized queries, no arbitrary SQL ever) | ✅ shipped |
 | **v0.2.x** | REST adapter (explicit endpoint allowlist); `legacy2mcp init` -- scans a repo (SOAP client / ORM models / Flask/FastAPI routes) and generates a starter config, with optional OpenAI-compatible LLM assist for ambiguous bits | ✅ shipped |
-| v0.2.x | HTTP/SSE transport, role→tool authorization, OAuth2 for SOAP | planned |
-| v0.3+ | Queue adapter (Kafka/RabbitMQ/SQS), workflow composition with approval gates, OpenTelemetry export | ideas |
+| **v0.3.x** | `legacy2mcp discover` (Postman / OpenAPI file / HAR / stored-procs / queue / `--webpage-url`) → reviewable `contract.yaml`; `--webpage-url` crawls a whole site, not just one page; `describe_capabilities` meta-tool | ✅ shipped |
+| **v0.4.x** | `legacy2mcp demo` -- try a contract/config in a chat page with no separate `init` step; `discover --out contract.html` | ✅ shipped |
+| **v0.5.x** | `discover`/`init`/`demo` all auto-open the test chat and print a ready-to-paste MCP client connection snippet; `init --webpage-url` goes straight to a config | ✅ shipped |
+| planned | HTTP/SSE transport, role→tool authorization, OAuth2 for SOAP | planned |
+| ideas | Queue adapter (Kafka/RabbitMQ/SQS), workflow composition with approval gates, OpenTelemetry export | ideas |
 
 Full detail in [docs/roadmap.md](docs/roadmap.md). The [`BaseAdapter`](src/legacy2mcp/adapters/base.py) interface (`discover_tools()` + `invoke()`) is the extension point — the server core handles validation, dispatch and audit for any adapter.
 

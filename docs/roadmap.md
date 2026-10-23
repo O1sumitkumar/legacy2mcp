@@ -95,7 +95,79 @@
   side effect, confidence, required fields, known error codes) before
   calling anything for real.
 
-## v0.3+ (ideas, unscheduled)
+## v0.3.1 -- `--webpage-url` crawls, not just one page
+
+- **`--webpage-url` crawls same-site pages** -- ✅ shipped: follows
+  `<a href>` links from the given URL (`--max-pages`/`--max-depth`, default
+  25/2, never leaving the starting host) instead of reading only the one
+  page given. A page with no `<form>` but real text content becomes a
+  read-only "get this page" tool instead of making discovery error out on
+  a plain content site. `adapters/rest_adapter.py` also strips HTML to
+  plain text (`legacy2mcp/htmltext.py`) instead of returning raw markup
+  when a REST response isn't JSON but is HTML.
+
+## v0.3.2 -- auto-filled `base_url` for webpage sources
+
+- **`init --from-contract` fills in `base_url` automatically** for a
+  webpage-sourced contract -- ✅ shipped: `discovery/webpage.py`'s
+  `source_label` is always the live URL it fetched, so `classify.py`
+  derives `scheme://netloc` from it instead of leaving
+  `REPLACE_ME_BASE_URL` for a human to fill in. Every other `discover`
+  source (a local file, a database) is unaffected. Practical effect: the
+  no-API-key test-chat page opens immediately for a webpage-discovered
+  server, no manual edit first.
+
+## v0.4.0 -- `legacy2mcp demo` + `discover --out contract.html`
+
+- **`legacy2mcp demo`** -- ✅ shipped: starts the same no-API-key
+  test-chat server `init` can auto-launch, directly from a
+  `--from-contract` contract or an existing `--config`, and saves a
+  standalone `chat.html` pointing at it. `webui.py`'s JSON endpoints send
+  `Access-Control-Allow-Origin: *`, since a saved `chat.html` opened as a
+  `file://...` page is a different browser origin than the server.
+- **`discover --out contract.html`** -- ✅ shipped: a human-readable HTML
+  report of a discovered contract, picked by extension, that's also a
+  valid `--from-contract`/`demo --from-contract` input -- the full
+  contract is embedded as JSON in the page, `</` escaped so a literal
+  `</script>` inside any field value can't break the parser.
+
+## v0.4.1 -- fixed a real `init --out <path>.html` corruption bug
+
+- `--out` always has to be a loadable YAML config -- an `.html`/`.htm`
+  path there used to be silently accepted and then corrupted: the
+  auto-generated plain-English report's default filename collided with
+  (and overwrote) it. Now fails fast with a clear message before writing
+  anything.
+
+## v0.5.0 -- one command, from discovery to a connected client
+
+- **`legacy2mcp discover` now auto-launches the demo too**, not just
+  `init` -- ✅ shipped: in an interactive terminal, once the contract is
+  written, if it has anything invocable, `discover` also writes a
+  runnable `config.yaml`, starts the test-chat server, and prints the
+  MCP client connection snippet (below). A contract with nothing
+  invocable (stored-procs/queue-only) skips the demo with a message
+  rather than failing.
+- **A ready-to-paste MCP client connection snippet**
+  (`legacy2mcp/client_snippet.py`) -- ✅ shipped: printed by `init`,
+  `demo`, and `discover` right after a runnable `config.yaml` exists --
+  Claude Desktop/Cursor JSON, VS Code JSON, and the Claude Code
+  `claude mcp add` one-liner, with the real absolute path filled in.
+- `legacy2mcp demo --from-contract` now also writes a real `config.yaml`
+  alongside the chat page, not just an in-memory one for the demo server.
+
+## v0.5.1 -- `legacy2mcp init --webpage-url`
+
+- A website now goes straight to a runnable config -- ✅ shipped -- the
+  same way `--wsdl-url`/`--rest-url` already did: `init` runs the
+  identical crawl `discover --webpage-url` does, then skips straight to
+  a config instead of stopping at a `contract.yaml` for review first.
+  Every operation still lands at `confidence: low`/`needs_review: true`
+  in the generated TODOs -- going straight to `init` skips a file, not
+  the review. `discover --webpage-url` is still there for anyone who
+  wants to review the contract before anything gets built.
+
+## Unscheduled ideas
 
 - **Queue adapter** (`type: queue`): publish/subscribe tools for
   Kafka, RabbitMQ, SQS. `legacy2mcp discover --queue-config` already
