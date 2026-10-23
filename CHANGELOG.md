@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   exits without needing a subcommand. The version comes from the installed
   distribution metadata, so it can't drift from `pyproject.toml`.
 
+### Fixed
+
+- **A bad `--config` no longer dumps a traceback**: `run`, `inspect` and
+  `demo --config` now print one `error: ...` line and exit 1 when the
+  config file is missing, isn't valid YAML, or fails schema validation.
+  `load_config()` raises a new `ConfigError` for all three, naming the
+  path (and the YAML line or the failing field).
+
 ## [0.5.1] - 2026-10-23
 
 ### Added
