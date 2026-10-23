@@ -1,6 +1,6 @@
 # Source types, in detail
 
-Four shapes `legacy2mcp init` handles, and exactly what each needs.
+Five shapes `legacy2mcp init` handles, and exactly what each needs.
 
 ## SOAP / WSDL
 
@@ -42,6 +42,33 @@ legacy2mcp init --rest-url "https://api.example.com" --out config.yaml
   the route decorators in source instead.
 - Non-`GET` endpoints are excluded by default, same `allow_write_operations`
   gate as SOAP.
+
+## Website with no API docs
+
+```bash
+legacy2mcp init --webpage-url "https://your-legacy-app.example.com/some-page" --out config.yaml
+```
+
+- **No API key needed.** Crawls same-site pages starting at that URL
+  (follows `<a href>` links, `--max-pages`/`--max-depth` bound it --
+  default 25 pages / depth 2, never leaving the starting host). Every
+  `<form>` found becomes a REST operation; a page with no form but real
+  text content becomes a read-only "get this page" tool.
+- **Every operation this produces is `confidence: low` and
+  `needs_review: true`** -- a form's actual server-side semantics can't
+  be inferred from markup alone. Tell the user to review the generated
+  `# TODO`s before trusting it, same as you would with any other scan.
+- Non-GET forms carry an extra TODO: they submit as
+  `application/x-www-form-urlencoded` in a real browser, but the `rest`
+  adapter always sends JSON -- confirm the backend accepts that before
+  relying on the generated tool.
+- `base_url` is filled in automatically (the URL's own host) -- unlike
+  every other contract-based source, there's no `REPLACE_ME_BASE_URL`
+  to fill in by hand here.
+- Prefer to review the discovered operations *before* anything gets
+  built? `legacy2mcp discover --webpage-url ... --out contract.yaml`
+  runs the identical crawl but stops at the contract -- `init` runs the
+  same thing, it just doesn't pause there.
 
 ## GitHub repo or local codebase (static scan)
 

@@ -43,6 +43,7 @@ depends entirely on it:
 |---|---|
 | A live WSDL URL (a SOAP service) | `--wsdl-url` |
 | A live REST API base URL | `--rest-url` |
+| A website with no API docs at all (forms, content pages) | `--webpage-url` -- crawls it, every operation lands low-confidence/needs-review |
 | A GitHub repo or local codebase (no live URL yet, or you want the schema derived from source) | `--github-url` / `--local-path` |
 | A database they want queried/read from | the GitHub/local-path path, scanning the ORM models, **or** hand-write the `db` adapter config directly if there's no ORM to scan |
 

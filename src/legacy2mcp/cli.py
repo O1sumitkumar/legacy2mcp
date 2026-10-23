@@ -229,11 +229,13 @@ def _serve_demo(
 
 
 def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, str]:
-    """Return (kind, value): kind is "wsdl" / "rest" / "github_url" / "local_path" / "from_contract"."""
+    """Return (kind, value): kind is "wsdl" / "rest" / "webpage" / "github_url" / "local_path" / "from_contract"."""
     if args.wsdl_url:
         return "wsdl", args.wsdl_url
     if args.rest_url:
         return "rest", args.rest_url
+    if args.webpage_url:
+        return "webpage", args.webpage_url
     if args.github_url:
         return "github_url", args.github_url
     if args.local_path:
@@ -243,7 +245,8 @@ def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, s
 
     if not interactive:
         print(
-            "Pass one of --wsdl-url, --rest-url, --github-url, --local-path, or --from-contract.",
+            "Pass one of --wsdl-url, --rest-url, --webpage-url, --github-url, --local-path, "
+            "or --from-contract.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -251,14 +254,17 @@ def _resolve_source(args: argparse.Namespace, interactive: bool) -> tuple[str, s
     print("What do you want to point legacy2mcp at?")
     print("  1) WSDL URL (SOAP service)")
     print("  2) REST API URL (tries OpenAPI/Swagger discovery)")
-    print("  3) GitHub repo URL or a local path to its source code")
-    choice = input("Choice [1-3]: ").strip()
+    print("  3) A website with no API docs at all (crawls it for forms/content)")
+    print("  4) GitHub repo URL or a local path to its source code")
+    choice = input("Choice [1-4]: ").strip()
 
     if choice == "1":
         return "wsdl", input("WSDL URL: ").strip()
     if choice == "2":
         return "rest", input("REST API base URL: ").strip()
     if choice == "3":
+        return "webpage", input("Website URL: ").strip()
+    if choice == "4":
         value = input("GitHub repo URL or local path: ").strip()
         kind = "github_url" if value.startswith(("http://", "https://", "git@")) else "local_path"
         return kind, value
@@ -293,12 +299,18 @@ def _resolve_llm(args: argparse.Namespace, interactive: bool) -> OpenAiLlmClient
 
 
 def _cmd_init(args: argparse.Namespace) -> None:
-    """Point legacy2mcp at a WSDL URL, a REST API URL, or a GitHub repo /
-    local path, and write a starter config.yaml. The WSDL/REST paths need
-    no AI assist -- zeep introspects a WSDL live, and REST tries an
-    OpenAPI/Swagger spec at the given URL. Only the GitHub/source-code path
-    is ambiguous enough to optionally use an LLM, and only to refine what
-    static AST analysis already found -- see discovery/."""
+    """Point legacy2mcp at a WSDL URL, a REST API URL, a website, or a
+    GitHub repo / local path, and write a starter config.yaml. The
+    WSDL/REST paths need no AI assist -- zeep introspects a WSDL live,
+    and REST tries an OpenAPI/Swagger spec at the given URL. --webpage-url
+    runs the exact same crawl `discovery/webpage.py` does for `discover
+    --webpage-url`, just skipping straight to a config instead of
+    stopping at a contract.yaml for review first -- every operation it
+    finds still lands at confidence=low/needs_review=true in the
+    generated TODOs, same as it would via discover. Only the
+    GitHub/source-code path is ambiguous enough to optionally use an
+    LLM, and only to refine what static AST analysis already found --
+    see discovery/."""
     interactive = sys.stdin.isatty()
 
     if Path(args.out).suffix.lower() in (".html", ".htm"):
@@ -337,6 +349,11 @@ def _cmd_init(args: argparse.Namespace) -> None:
                 print(f"warning: {exc}", file=sys.stderr)
                 routes = []
             config, todos = classify.build_config(ScanResult(routes=routes), base_url=value)
+
+        elif kind == "webpage":
+            source_label = value
+            contract = webpage.contract_from_webpage(value, max_pages=args.max_pages, max_depth=args.max_depth)
+            config, todos = classify.build_config_from_contract(contract)
 
         elif kind == "from_contract":
             source_label = value
@@ -613,19 +630,36 @@ def main() -> None:
     init_parser = subparsers.add_parser(
         "init",
         help=(
-            "Point legacy2mcp at a WSDL URL, a REST API URL, or a GitHub repo / local "
-            "source path, and generate a starter config.yaml. Prompts interactively for "
-            "whichever of those three you don't pass as a flag."
+            "Point legacy2mcp at a WSDL URL, a REST API URL, a website, or a GitHub repo / "
+            "local source path, and generate a starter config.yaml. Prompts interactively for "
+            "whichever of those you don't pass as a flag."
         ),
     )
     source_group = init_parser.add_mutually_exclusive_group()
     source_group.add_argument("--wsdl-url", help="A live WSDL URL (SOAP service) to point the generated config at directly.")
     source_group.add_argument("--rest-url", help="A live REST API base URL; tries OpenAPI/Swagger discovery against it.")
+    source_group.add_argument(
+        "--webpage-url",
+        help=(
+            "A live website with no API docs at all -- crawls same-site pages starting here "
+            "(--max-pages/--max-depth bound it) the same way `legacy2mcp discover --webpage-url` "
+            "does, then turns the result straight into a config instead of stopping at a "
+            "contract.yaml for review first. Every operation still lands at confidence=low / "
+            "needs_review=true in the generated config's TODOs -- going straight to `init` "
+            "skips a file, not the review."
+        ),
+    )
     source_group.add_argument("--github-url", help="Repo to clone and statically scan for a SOAP client / DB model / routes.")
     source_group.add_argument("--local-path", help="Already-checked-out repo to scan (skips cloning).")
     source_group.add_argument(
         "--from-contract",
         help="A contract.yaml written by `legacy2mcp discover` -- turns its reviewed operations into a runnable config.",
+    )
+    init_parser.add_argument(
+        "--max-pages", type=int, default=25, help="Max pages to crawl for --webpage-url (default: 25)."
+    )
+    init_parser.add_argument(
+        "--max-depth", type=int, default=2, help="Max link depth to follow for --webpage-url (default: 2)."
     )
     init_parser.add_argument(
         "--github-token-env", help="Env var holding a GitHub token, for private repos (--github-url only)."

@@ -25,6 +25,9 @@ def _args(**overrides) -> argparse.Namespace:
     defaults = dict(
         wsdl_url=None,
         rest_url=None,
+        webpage_url=None,
+        max_pages=25,
+        max_depth=2,
         github_url=None,
         local_path=None,
         from_contract=None,
@@ -131,6 +134,27 @@ def test_init_from_wsdl_url_needs_no_llm_or_network(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
 
     _cmd_init(_args(wsdl_url="https://svc.example.com/Legacy?wsdl", out=str(out_path)))
+
+
+def test_init_from_webpage_url_crawls_and_builds_a_runnable_config(tmp_path, monkeypatch):
+    html = '<html><body><form action="/search" method="GET"><input name="q"></form></body></html>'
+
+    class _FakeResponse:
+        status_code = 200
+        text = html
+        headers: dict = {}
+
+    monkeypatch.setattr("requests.get", lambda url, timeout: _FakeResponse())
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+    out_path = tmp_path / "config.yaml"
+    _cmd_init(_args(webpage_url="https://example.com/", out=str(out_path)))
+
+    reloaded = load_config(str(out_path))
+    assert reloaded.adapters[0].type == "rest"
+    # discovery/webpage.py's source_label is the live URL -- classify.py
+    # derives base_url from it, same as the --from-contract path does.
+    assert reloaded.adapters[0].config["base_url"] == "https://example.com"
 
 
 def test_init_rejects_an_html_out_path_before_writing_anything(tmp_path, monkeypatch):

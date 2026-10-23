@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-23
+
+### Added
+
+- **`legacy2mcp init --webpage-url`**: a website now goes straight to a
+  runnable config, same as `--wsdl-url`/`--rest-url` already did --
+  `init` runs the identical crawl `discovery/webpage.py` does for
+  `discover --webpage-url` (same `--max-pages`/`--max-depth` bounds),
+  then skips straight to `classify.build_config_from_contract()` instead
+  of stopping at a `contract.yaml` for a separate review step. Every
+  operation still lands at `confidence: low` / `needs_review: true` in
+  the generated TODOs -- going straight to `init` skips a file, not the
+  review. `discover --webpage-url` is still there for anyone who wants
+  to review the contract before anything gets built. Added to the
+  interactive `legacy2mcp init` prompt as option 3 (bumping the repo
+  option to 4).
+
 ## [0.5.0] - 2026-10-23
 
 ### Added

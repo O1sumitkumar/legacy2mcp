@@ -103,8 +103,8 @@ your AI client for real is a copy-paste, not a separate step. `legacy2mcp
 discover` (below) does the same: write a contract, auto-open the same test
 chat, and print the same connection snippet, in one command.
 
-Have your own WSDL, REST API, or codebase instead? `legacy2mcp init` (no
-flags) walks you through it — see
+Have your own WSDL, REST API, website, or codebase instead? `legacy2mcp
+init` (no flags) walks you through it — see
 [Generate a config automatically](#generate-a-config-automatically). More
 demos (a local SOAP service, Docker, a WSDL served by raw URL) are listed in
 [examples/](examples/README.md).
@@ -292,24 +292,27 @@ legacy2mcp init
 What do you want to point legacy2mcp at?
   1) WSDL URL (SOAP service)
   2) REST API URL (tries OpenAPI/Swagger discovery)
-  3) GitHub repo URL or a local path to its source code
-Choice [1-3]:
+  3) A website with no API docs at all (crawls it for forms/content)
+  4) GitHub repo URL or a local path to its source code
+Choice [1-4]:
 ```
 
 | Option | What happens | Needs an LLM key? |
 |---|---|---|
 | **WSDL URL** | Points a `soap` adapter at it directly -- `zeep` introspects the live WSDL at `inspect`/`run` time anyway, so nothing needs scanning up front. | No |
 | **REST API URL** | Tries the common OpenAPI/Swagger spec locations (`/openapi.json`, `/swagger.json`, ...) against that URL and builds the `rest` adapter's endpoint list from the real spec if one's found; an empty scaffold otherwise. | No |
+| **Website** | Crawls same-site pages starting there (`--max-pages`/`--max-depth` bound it, default 25/2) the same way `legacy2mcp discover --webpage-url` does, then goes straight to a config instead of stopping at a `contract.yaml` -- every operation still lands at `confidence: low` / `needs_review: true` in the generated TODOs, going through `init` skips a file, not the review. | No |
 | **GitHub repo / local path** | Clones (or reads) the repo and statically scans its Python source (AST only, never executed) for a `zeep.Client(...)` call, a SQLAlchemy/Flask-SQLAlchemy model, or Flask/FastAPI routes -- picking `soap`/`db`/`rest` accordingly. | Optional |
 
 Each also works non-interactively via a flag -- `--wsdl-url`, `--rest-url`,
-`--github-url`, or `--local-path` -- for scripting or CI. Only the GitHub/
-source-code path can use an LLM, and only to refine what static analysis
-already found (ambiguous parameter types, read-vs-write classification) --
-never a dump of your repo. It needs no extra dependency, just an
-OpenAI-compatible API key via `--llm-api-key-env`, or an interactive hidden
-prompt if you omit that (never written to disk); pass `--scan-only` to skip
-it outright and run static-analysis-only, same as not entering a key.
+`--webpage-url`, `--github-url`, or `--local-path` -- for scripting or CI.
+Only the GitHub/source-code path can use an LLM, and only to refine what
+static analysis already found (ambiguous parameter types, read-vs-write
+classification) -- never a dump of your repo. It needs no extra
+dependency, just an OpenAI-compatible API key via `--llm-api-key-env`, or
+an interactive hidden prompt if you omit that (never written to disk);
+pass `--scan-only` to skip it outright and run static-analysis-only, same
+as not entering a key.
 
 ```bash
 legacy2mcp init --github-url https://github.com/you/your-api --scan-only --out config.yaml
@@ -353,12 +356,13 @@ does and doesn't guarantee before pointing it at anything real.
 
 ## Discover a legacy interface before generating a server
 
-`init` covers a live WSDL, a live REST URL, and a repo it can scan. For
-everything else -- a Postman collection someone already built, an OpenAPI
-spec file sitting in a repo with no server running yet, a database's
-stored-procedure catalog, a HAR capture of real traffic, queues you
-already know about, or a plain webpage with no API docs at all -- there's
-an explicit step first:
+`init` covers a live WSDL, a live REST URL, a website (`--webpage-url`),
+and a repo it can scan -- all of those go straight to a config, no
+separate step needed. For everything else -- a Postman collection someone
+already built, an OpenAPI spec file sitting in a repo with no server
+running yet, a database's stored-procedure catalog, a HAR capture of real
+traffic, or queues you already know about -- there's an explicit step
+first:
 
 ```bash
 legacy2mcp discover --postman-file my-collection.json --out contract.yaml
@@ -366,8 +370,11 @@ legacy2mcp discover --openapi-file spec.yaml --out contract.yaml
 legacy2mcp discover --har-file traffic.har --out contract.yaml
 legacy2mcp discover --stored-procs --db-dialect postgres --db-dsn-env LEGACY_DB_DSN --out contract.yaml
 legacy2mcp discover --queue-config queues.yaml --out contract.yaml
-legacy2mcp discover --webpage-url "https://your-legacy-app.example.com/some-page" --out contract.yaml
 ```
+
+A website *can* go through `discover --webpage-url` too (see below) if you
+want to review the contract before anything gets built -- `init
+--webpage-url` runs the identical crawl, it just doesn't pause there.
 
 Each writes a **Legacy Interface Contract** (`contract.yaml`): every
 operation's inputs, outputs, enums, error codes, whether it reads or
