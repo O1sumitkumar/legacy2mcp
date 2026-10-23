@@ -81,21 +81,30 @@ Also published to the **[MCP Registry](https://registry.modelcontextprotocol.io/
 
 ## Quick start
 
-No API key, no cloning — against a public demo API:
+No API key, no cloning — pick whichever matches what you actually have,
+against live public demo targets:
 
 ```bash
 pip install legacy2mcp
+
+# REST API -- tries OpenAPI/Swagger discovery
 legacy2mcp init --rest-url "https://petstore3.swagger.io/api/v3"
+
+# WSDL / SOAP service -- zeep introspects it live, no scan needed
+legacy2mcp init --wsdl-url "http://www.dneonline.com/calculator.asmx?WSDL"
+
+# A website with no API docs at all -- crawls it for forms/content
+legacy2mcp init --webpage-url "https://legacy2mcp.com/"
 ```
 
-Run that from a real terminal and that's the whole thing: it writes
-`config.yaml`, opens a local test-chat page with a clickable example
+Run any one of those from a real terminal and that's the whole thing: it
+writes `config.yaml`, opens a local test-chat page with a clickable example
 question under every discovered tool — click one and see a real response
-come back from the live API, no AI key needed, just local keyword matching
-to sanity-check the server works — and prints a ready-to-paste connection
-snippet for Claude Desktop, Cursor, VS Code, and Claude Code. Wiring it
-into a real AI client is a copy-paste, not a separate step. (Prefer the
-raw tool list instead? `legacy2mcp inspect --config config.yaml`.)
+come back from the live source, no AI key needed, just local keyword
+matching to sanity-check the server works — and prints a ready-to-paste
+connection snippet for Claude Desktop, Cursor, VS Code, and Claude Code.
+Wiring it into a real AI client is a copy-paste, not a separate step.
+(Prefer the raw tool list instead? `legacy2mcp inspect --config config.yaml`.)
 
 [`legacy2mcp discover`](#discover-a-legacy-interface-before-generating-a-server)
 does the same for sources that benefit from a review step first (a
